@@ -15,20 +15,18 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Ensure Ninja is available
-        run: command -v ninja >/dev/null || brew install ninja
       - name: Restore incremental CMake build cache
         uses: actions/cache@v4
         with:
           path: build
-          key: grainbrain-macos15-ninja-v1-${{ hashFiles('CMakeLists.txt') }}-${{ github.sha }}
+          key: grainbrain-macos15-xcode-v2-${{ hashFiles('CMakeLists.txt') }}-${{ github.sha }}
           restore-keys: |
-            grainbrain-macos15-ninja-v1-${{ hashFiles('CMakeLists.txt') }}-
-            grainbrain-macos15-ninja-v1-
+            grainbrain-macos15-xcode-v2-${{ hashFiles('CMakeLists.txt') }}-
+            grainbrain-macos15-xcode-v2-
       - name: Configure
-        run: cmake -S . -B build -G "Ninja Multi-Config" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+        run: cmake -S . -B build -G Xcode -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
       - name: Build
-        run: cmake --build build --config Release --parallel 4
+        run: cmake --build build --config Release --parallel 3
       - name: Bundle deliverables
         shell: bash
         run: |
@@ -36,6 +34,9 @@ jobs:
           find build/GrainBrain_artefacts/Release -name '*.vst3' -type d -exec cp -R {} dist/ \;
           find build/GrainBrain_artefacts/Release -name '*.component' -type d -exec cp -R {} dist/ \;
           find build/GrainBrain_artefacts/Release -name '*.app' -type d -exec cp -R {} dist/ \;
+          cp install-macos.command dist/Install-GrainBrain.command
+          chmod +x dist/Install-GrainBrain.command
+          test -d dist/GrainBrain.vst3
           test -n "$(ls -A dist)"
           hdiutil create -volname GrainBrain -srcfolder dist -ov -format UDZO GrainBrain-macOS.dmg
       - uses: actions/upload-artifact@v4
