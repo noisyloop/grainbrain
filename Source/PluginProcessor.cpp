@@ -75,6 +75,19 @@ void GrainBrainAudioProcessor::applyPreset(int index){
  if(index<0||index>=5)return;const char* ids[]={"size","density","position","spray","pitch","pitchRand","reverse","spread","gain","lfoRate","lfoDepth"};
  for(int i=0;i<11;++i){auto* p=params.getParameter(ids[i]);p->setValueNotifyingHost(p->convertTo0to1(presets[index][i]));}
 }
+bool GrainBrainAudioProcessor::saveUserPreset(const juce::File& file) {
+ juce::MemoryBlock data; getStateInformation(data);
+ return file.replaceWithData(data.getData(), data.getSize());
+}
+bool GrainBrainAudioProcessor::loadUserPreset(const juce::File& file) {
+ if (!file.existsAsFile() || file.getSize() <= 0 || file.getSize() > 1024 * 1024) return false;
+ juce::MemoryBlock data;
+ if (!file.loadFileAsData(data)) return false;
+ auto xml = std::unique_ptr<juce::XmlElement>(getXmlFromBinary(data.getData(), (int)data.getSize()));
+ if (!xml || !xml->hasTagName(params.state.getType())) return false;
+ setStateInformation(data.getData(), (int)data.getSize());
+ return true;
+}
 void GrainBrainAudioProcessor::getStateInformation(juce::MemoryBlock& b){auto state=params.copyState();std::unique_ptr<juce::XmlElement> xml(state.createXml());copyXmlToBinary(*xml,b);}
 void GrainBrainAudioProcessor::setStateInformation(const void* data,int size){std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data,size));if(xml&&xml->hasTagName(params.state.getType()))params.replaceState(juce::ValueTree::fromXml(*xml));}
 juce::AudioProcessorEditor* GrainBrainAudioProcessor::createEditor(){return new GrainBrainAudioProcessorEditor(*this);}
