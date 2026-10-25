@@ -53,6 +53,9 @@ private:
  int sequenceStep=-1, joyRecordedCount=0;
  bool wasRecording=false, wasPlaying=false;
  std::array<std::array<float,2>,1024> joyRecording{};
+ // Host state snapshots and audio recording share this short fixed buffer.
+ // Audio uses a try-lock so saving a preset never blocks the audio callback.
+ juce::CriticalSection joyRecordingLock;
  juce::AudioBuffer<float> delayLine;
  int delayIndex=0;
  float currentBpm=120.f;
