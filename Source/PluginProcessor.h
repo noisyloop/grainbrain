@@ -44,6 +44,6 @@ private:
  int glitchCounter=0;
  std::mt19937 rng{0xC0FFEE};
  float random01();
- void startGrain(Note&,float,float,float,float,float);
+ void startGrain(Note&,float,float,float,float,float,float,float);
  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GrainBrainAudioProcessor)
 };
