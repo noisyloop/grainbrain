@@ -1,5 +1,13 @@
 # GrainBrain
 
+## Download for macOS
+
+**[⬇ Download the latest GrainBrain macOS build](https://github.com/noisyloop/grainbrain/actions/workflows/macos.yml)**
+
+Open the newest **successful** workflow run and scroll to **Artifacts**. Download **GrainBrain-macOS** (ZIP), unzip it, then open `GrainBrain-macOS.dmg` or use the included bundles. GitHub may require you to sign in to download workflow artifacts. These are CI test builds, not signed releases.
+
+To install manually, copy `GrainBrain.vst3` to `~/Library/Audio/Plug-Ins/VST3/`, `GrainBrain.component` to `~/Library/Audio/Plug-Ins/Components/`, and `GrainBrain.app` to `/Applications/`. You may need to approve the unsigned app in macOS Privacy & Security.
+
 Experimental granular sample synthesizer for macOS (JUCE 8, C++17).
 
 ## Features
