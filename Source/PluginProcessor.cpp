@@ -71,8 +71,24 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
  }
 }
 void GrainBrainAudioProcessor::applyPreset(int index){
- const float presets[][11]={{110,18,.35f,.18f,0,1,.12f,.8f,.65f,.4f,.2f},{280,35,.5f,.65f,-12,5,.4f,1,.6f,.15f,.6f},{35,60,.25f,.8f,12,9,.65f,1,.45f,4,.5f},{420,9,.65f,.2f,-7,.2f,.1f,.9f,.7f,.06f,.7f},{75,28,.1f,.05f,0,0,0,.3f,.8f,1.7f,.15f}};
- if(index<0||index>=5)return;const char* ids[]={"size","density","position","spray","pitch","pitchRand","reverse","spread","gain","lfoRate","lfoDepth"};
+ // Classic (0-4), Motion (5-8), Pro (9-12). All banks are free and editable.
+ const float presets[][11]={
+  {110,18,.35f,.18f,0,1,.12f,.8f,.65f,.4f,.2f},
+  {280,35,.5f,.65f,-12,5,.4f,1,.6f,.15f,.6f},
+  {35,60,.25f,.8f,12,9,.65f,1,.45f,4,.5f},
+  {420,9,.65f,.2f,-7,.2f,.1f,.9f,.7f,.06f,.7f},
+  {75,28,.1f,.05f,0,0,0,.3f,.8f,1.7f,.15f},
+  {260,22,.4f,.24f,-5,1,.1f,.85f,.65f,.22f,.7f},
+  {95,42,.5f,.12f,0,2,.18f,1,.58f,2.5f,.55f},
+  {175,31,.6f,.38f,7,3,.32f,1,.52f,.7f,.85f},
+  {310,14,.2f,.5f,-12,4,.45f,.9f,.7f,.08f,.95f},
+  {220,45,.48f,.75f,0,6,.5f,1,.6f,1.3f,.9f},
+  {62,68,.3f,.55f,12,8,.4f,1,.48f,5.2f,.75f},
+  {390,12,.65f,.9f,-19,10,.65f,1,.72f,.035f,1.f},
+  {140,54,.15f,.7f,5,12,.8f,1,.5f,8.0f,.95f}
+ };
+ if(index<0||index>=13)return;
+ const char* ids[]={"size","density","position","spray","pitch","pitchRand","reverse","spread","gain","lfoRate","lfoDepth"};
  for(int i=0;i<11;++i){auto* p=params.getParameter(ids[i]);p->setValueNotifyingHost(p->convertTo0to1(presets[index][i]));}
 }
 bool GrainBrainAudioProcessor::saveUserPreset(const juce::File& file) {
