@@ -26,6 +26,8 @@ public:
  bool loadSample(const juce::File&);
  void useFactoryWave();
  void applyPreset(int);
+ bool saveUserPreset(const juce::File&);
+ bool loadUserPreset(const juce::File&);
  juce::AudioProcessorValueTreeState params;
  juce::String getSampleName() const;
 private:
