@@ -31,8 +31,8 @@ private:
  juce::MemoryBlock snapshotA,snapshotB;
  juce::TextButton randomButton{"RANDOMIZE"},randomSafeButton{"RANDOMIZE TIME"},lfoSyncButton{"LFO SYNC"};
  juce::ComboBox beatDivisionBox,lfoDivisionBox,filterModeBox;
- juce::Slider randomAmount, timeMorphKnob, vowelKnob, vowelShiftKnob;
- juce::Label randomLabel,timeLabel,vowelLabel,shiftLabel,beatLabel,lfoBeatLabel,modeLabel;
+ juce::Slider randomAmount, timeMorphKnob, vowelKnob, vowelShiftKnob, filterMixKnob;
+ juce::Label randomLabel,timeLabel,vowelLabel,shiftLabel,beatLabel,lfoBeatLabel,modeLabel,filterMixLabel;
  std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment>> comboAttachments;
  std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>> newAttachments;
  juce::Slider delayMixKnob,delayFeedbackKnob,seqDepthKnob;
