@@ -40,15 +40,15 @@ bool GrainBrainAudioProcessor::loadSample(const juce::File& f){
  return true;
 }
 juce::String GrainBrainAudioProcessor::getSampleName() const{juce::ScopedLock lock(const_cast<juce::CriticalSection&>(sampleLock));return sampleName;}
-void GrainBrainAudioProcessor::startGrain(Note& note,float position,float spray,float size,float pitch,float pitchRand){
+void GrainBrainAudioProcessor::startGrain(Note& note,float position,float spray,float size,float pitch,float pitchRand,float reverse,float spread){
  auto it=std::find_if(grains.begin(),grains.end(),[](const Grain& g){return !g.active;});if(it==grains.end())return;
  auto& g=*it;int n=sample.getNumSamples();if(n<16)return;
  g.length=juce::jmax(16,int(size*.001*sampleRateHz));g.age=0;
  double offset=(random01()*2-1)*spray;g.position=juce::jlimit(0.0,1.0,double(position+offset))*(n-1);
  double semis=(note.number-60)+pitch+(random01()*2-1)*pitchRand;
  g.step=(44100.0/sampleRateHz)*std::pow(2.0,semis/12.0);
- if(random01()<params.getRawParameterValue("reverse")->load())g.step=-g.step;
- g.amp=note.velocity;g.pan=(random01()*2-1)*params.getRawParameterValue("spread")->load();g.active=true;
+ if(random01()<reverse)g.step=-g.step;
+ g.amp=note.velocity;g.pan=(random01()*2-1)*spread;g.active=true;
 }
 void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::MidiBuffer& midi){
  juce::ScopedNoDenormals noDenormals;out.clear();juce::ScopedTryLock lock(sampleLock);if(!lock.isLocked())return;
@@ -66,7 +66,7 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
   return juce::jlimit(minV[i],maxV[i],base+(axis-.5f)*(maxV[i]-minV[i])*.85f);
  };
 
- float size=effective(0),density=effective(1),pos=effective(2),spray=effective(3),pitch=effective(4),pitchRand=effective(5),gain=effective(8),rate=effective(9),depth=effective(10);
+ float size=effective(0),density=effective(1),pos=effective(2),spray=effective(3),pitch=effective(4),pitchRand=effective(5),reverse=effective(6),spread=effective(7),gain=effective(8),rate=effective(9),depth=effective(10);
  float cutoff=effective(11),resonance=effective(12),filterMode=effective(13),filterMotion=effective(14),glitch=effective(15);
  int n=sample.getNumSamples();if(n<16)return;
  juce::MidiBuffer::Iterator events(midi);juce::MidiMessage msg;int eventPos=0;bool hasEvent=events.getNextEvent(msg,eventPos);
@@ -79,7 +79,7 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
    hasEvent=events.getNextEvent(msg,eventPos);
   }
   float modPos=juce::jlimit(0.f,1.f,pos+float(std::sin(lfoPhase*2*pi))*depth*.5f);lfoPhase+=rate/sampleRateHz;if(lfoPhase>=1)lfoPhase-=1;
-  for(auto& note:notes)if(note.active){note.spawnClock+=density/sampleRateHz;if(note.spawnClock>=1){note.spawnClock-=1;startGrain(note,modPos,spray,size,pitch,pitchRand);}}
+  for(auto& note:notes)if(note.active){note.spawnClock+=density/sampleRateHz;if(note.spawnClock>=1){note.spawnClock-=1;startGrain(note,modPos,spray,size,pitch,pitchRand,reverse,spread);}}
   float left=0,right=0;
   for(auto& g:grains)if(g.active){
    double wrapped=std::fmod(g.position,double(n));if(wrapped<0)wrapped+=n;int a=int(wrapped),b=(a+1)%n;
