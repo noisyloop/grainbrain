@@ -109,6 +109,18 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
  if(playing && !wasPlaying)joyPlaybackPosition=0;
  wasPlaying=playing;
  int n=sample.getNumSamples();if(n<16)return;
+ // Precompute vowel resonator coefficients once per block instead of per audio sample.
+ constexpr float vowelTable[5][3]={{800,1150,2900},{400,1700,2600},{350,2100,3000},{450,800,2830},{325,700,2530}};
+ struct BandCoeffs {float a1=0,a2=0,gain=0;};
+ std::array<BandCoeffs,3> vowelCoeffs{};
+ const int vowelLow=juce::jlimit(0,4,int(vowel));
+ const int vowelHigh=juce::jmin(4,vowelLow+1);
+ for(int band=0;band<3;++band){
+  const float center=juce::jlimit(80.f,float(sampleRateHz*.43),juce::jmap(vowel-float(vowelLow),vowelTable[vowelLow][band],vowelTable[vowelHigh][band])*std::pow(2.f,vowelShift/12.f));
+  const float bandwidth=juce::jmax(70.f,center*(.09f+.12f*(1.f-juce::jlimit(0.f,1.f,resonance))));
+  const float pole=std::exp(float(-pi)*bandwidth/float(sampleRateHz));
+  vowelCoeffs[band]={2.f*pole*std::cos(float(2*pi)*center/float(sampleRateHz)),pole*pole,(1.f-pole)*(.85f/(1.f+float(band)))};
+ }
  juce::MidiBuffer::Iterator events(midi);juce::MidiMessage msg;int eventPos=0;bool hasEvent=events.getNextEvent(msg,eventPos);
  for(int i=0;i<out.getNumSamples();++i){
   while(hasEvent&&eventPos<=i){
@@ -174,22 +186,12 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
    if(mode==4){
     // Three resonant bands with interpolated formant centres for A/E/I/O/U.
     // Poles remain inside the unit circle; no allocations in the audio callback.
-    constexpr float vowels[5][3]={{800,1150,2900},{400,1700,2600},{350,2100,3000},{450,800,2830},{325,700,2530}};
-    const int lower=juce::jlimit(0,4,int(vowel)),upper=juce::jmin(4,lower+1);
-    const float blend=vowel-float(lower);
-    const float shift=std::pow(2.f,vowelShift/12.f);
     float result=0.f;
     for(int band=0;band<3;++band){
-     const float center=juce::jlimit(80.f,float(sampleRateHz*.43),
-       juce::jmap(blend,vowels[lower][band],vowels[upper][band])*shift);
-     const float bandwidth=juce::jmax(70.f,center*(.09f+.12f*(1.f-juce::jlimit(0.f,1.f,resonance))));
-     const float radius=std::exp(float(-pi)*bandwidth/float(sampleRateHz));
-     const float omega=float(2*pi)*center/float(sampleRateHz);
-     const float a1=2.f*radius*std::cos(omega),a2=radius*radius;
-     // Equivalent: y[n] = x[n] + 2r cos(w) y[n-1] - r² y[n-2]
-     const float output=juce::jlimit(-100.f,100.f,channels[ch]+a1*vowelZ1[ch][band]-a2*vowelZ2[ch][band]);
+     const auto& b=vowelCoeffs[band];
+     const float output=juce::jlimit(-100.f,100.f,channels[ch]+b.a1*vowelZ1[ch][band]-b.a2*vowelZ2[ch][band]);
      vowelZ2[ch][band]=vowelZ1[ch][band];vowelZ1[ch][band]=output;
-     result+=output*(1.f-radius)*(.85f/(1.f+float(band)));
+     result+=output*b.gain;
     }
     channels[ch]=result;
    }else{
