@@ -75,7 +75,7 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
   // The second oscillator follows LFO 1 at a 3:2 ratio. Pro patches move their filter automatically.
   const float motion=std::sin(float(lfoPhase*2*pi*1.5));
   const float hz=juce::jlimit(60.f,float(sampleRateHz*.42),cutoff*std::pow(2.f,filterMotion*motion*4.f));
-  const float f=2.f*std::sin(float(pi)*hz/float(sampleRateHz));
+  const float f=juce::jmin(.65f,2.f*std::sin(float(pi)*hz/float(sampleRateHz))); // Stable SVF range
   const float damping=juce::jlimit(.2f,1.95f,2.f-1.25f*resonance);
   float channels[2]={left,right};
   for(int ch=0;ch<2;++ch){
