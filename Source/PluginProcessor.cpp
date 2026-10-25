@@ -70,21 +70,20 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
  const char* targets[]={"size","density","position","spray","pitch","pitchRand","reverse","spread","gain","lfoRate","lfoDepth","cutoff","resonance","filterMode","filterMotion","glitch"};
  const float minV[]={15,1,0,0,-24,0,0,0,0,.02f,0,80,.1f,0,0,0};
  const float maxV[]={500,70,1,1,24,12,1,1,1,15,1,18000,1.4f,3,1,1};
+ std::array<float,16> baseValues{},routes{};
+ for(int k=0;k<16;++k){
+  baseValues[k]=get(targets[k]);
+  const auto routeName="joyRoute"+juce::String(k);
+  routes[k]=get(routeName.toRawUTF8());
+ }
  float joyX=get("joyX"),joyY=get("joyY");
- auto effective=[&](int i){
-  const float base=get(targets[i]);
-  const juce::String id="joyRoute"+juce::String(i);
-  const float route=get(id.toRawUTF8());
-  if(route<.5f)return base;
+ auto effective=[&](int k){
+  const float route=routes[k];
+  if(route<.5f)return baseValues[k];
   const float axis=route<1.5f?joyX:joyY;
-  return juce::jlimit(minV[i],maxV[i],base+(axis-.5f)*(maxV[i]-minV[i])*.85f);
+  return juce::jlimit(minV[k],maxV[k],baseValues[k]+(axis-.5f)*(maxV[k]-minV[k])*.85f);
  };
 
- const bool freeze=get("freeze")>.5f;
- const float delayWet=get("delayMix"),feedback=get("delayFeedback");
- const bool sequenceEnabled=get("seqOn")>.5f;
- const float sequenceDepth=get("seqDepth");
- const bool recording=get("joyRecord")>.5f, playing=get("joyPlay")>.5f;
  float size=effective(0),density=effective(1),pos=effective(2),spray=effective(3),pitch=effective(4),pitchRand=effective(5),reverse=effective(6),spread=effective(7),gain=effective(8),rate=effective(9),depth=effective(10);
  float cutoff=effective(11),resonance=effective(12),filterMode=effective(13),filterMotion=effective(14),glitch=effective(15);
  if(auto* playHead=getPlayHead()){
