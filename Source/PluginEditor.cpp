@@ -62,6 +62,7 @@ GrainBrainAudioProcessorEditor::GrainBrainAudioProcessorEditor(GrainBrainAudioPr
  dial(vowelKnob,vowelLabel,"A E I O U","vowel");
  dial(vowelShiftKnob,shiftLabel,"VOWEL SHIFT","vowelShift");
  dial(timeMorphKnob,timeLabel,"TIME DRIFT","seqTimeMod");
+ dial(filterMixKnob,filterMixLabel,"FILTER MIX","filterMix");
  clearRoutes.onClick=[this]{for(int i=0;i<16;++i)if(auto* p=processor.params.getParameter("joyRoute"+juce::String(i)))p->setValueNotifyingHost(0.f);};
  heading.setText("GRAIN BRAIN / GRANULAR RANDOMIZER",juce::dontSendNotification);
  heading.setFont(juce::Font(juce::FontOptions(23.0f).withStyle("Bold")));
@@ -154,6 +155,7 @@ void GrainBrainAudioProcessorEditor::resized(){
  lfoDivisionBox.setBounds(793,842,120,28);lfoBeatLabel.setBounds(793,815,120,24);
  timeMorphKnob.setBounds(641,895,92,86);timeLabel.setBounds(634,982,105,22);
  lfoSyncButton.setBounds(795,901,117,32);
+ filterMixKnob.setBounds(947,896,92,86);filterMixLabel.setBounds(938,982,110,22);
 }
 bool GrainBrainAudioProcessorEditor::isInterestedInFileDrag(const juce::StringArray& files){
  for(auto& f:files)if(juce::File(f).hasFileExtension("wav;aif;aiff"))return true;return false;
