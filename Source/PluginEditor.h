@@ -10,7 +10,7 @@ public:
 private:
  GrainBrainAudioProcessor& processor;
  juce::Label heading,sampleLabel,helpLabel;
- juce::TextButton loadButton{"LOAD SAMPLE"},factoryButton{"FACTORY WAVE"};
+ juce::TextButton loadButton{"LOAD SAMPLE"},factoryButton{"FACTORY WAVE"},saveButton{"SAVE PRESET"},openButton{"OPEN PRESET"};
  juce::ComboBox presetBox;
  std::vector<std::unique_ptr<juce::Slider>> sliders;
  std::vector<std::unique_ptr<juce::Label>> labels;
