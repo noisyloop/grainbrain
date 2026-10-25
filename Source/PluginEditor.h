@@ -27,6 +27,8 @@ private:
  GrainBrainAudioProcessor& processor;
  GrainBrainOrb orb;
  juce::TextButton clearRoutes{"CLEAR LINKS"},freezeButton{"FREEZE"},recordButton{"REC XY"},playButton{"LOOP XY"},seqButton{"GLITCH STEPS"},resetJoyButton{"CENTER XY"};
+ juce::TextButton storeA{"SAVE A"},storeB{"SAVE B"},recallA{"LOAD A"},recallB{"LOAD B"};
+ juce::MemoryBlock snapshotA,snapshotB;
  juce::Slider delayMixKnob,delayFeedbackKnob,seqDepthKnob;
  std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> delayMixAttachment,delayFeedbackAttachment,seqDepthAttachment;
  juce::Label delayLabel,feedbackLabel,seqLabel;
