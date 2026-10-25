@@ -48,6 +48,7 @@ private:
  int glitchCounter=0;
  double freezePosition=.35, sequencePhase=0, joyCaptureClock=0, joyPlaybackPosition=0;
  int sequenceStep=-1, joyRecordedCount=0;
+ bool wasRecording=false, wasPlaying=false;
  std::array<std::array<float,2>,1024> joyRecording{};
  std::array<float,2> delayFeedback{{0,0}};
  juce::AudioBuffer<float> delayLine;
