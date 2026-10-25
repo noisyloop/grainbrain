@@ -1,6 +1,5 @@
 #include "PluginEditor.h"
 GrainBrainAudioProcessorEditor::GrainBrainAudioProcessorEditor(GrainBrainAudioProcessor& p):AudioProcessorEditor(&p),processor(p){
- setSize(780,490);
  heading.setText("GRAIN BRAIN / GRANULAR RANDOMIZER",juce::dontSendNotification);
  heading.setFont(juce::Font(juce::FontOptions(23.0f).withStyle("Bold")));
  heading.setColour(juce::Label::textColourId,juce::Colours::white);addAndMakeVisible(heading);
@@ -25,6 +24,7 @@ GrainBrainAudioProcessorEditor::GrainBrainAudioProcessorEditor(GrainBrainAudioPr
   auto l=std::make_unique<juce::Label>();l->setText(names[i],juce::dontSendNotification);l->setJustificationType(juce::Justification::centred);
   l->setColour(juce::Label::textColourId,juce::Colours::white);addAndMakeVisible(*l);labels.push_back(std::move(l));
  }
+ setSize(780,490); // resized() accesses sliders/labels: initialize them first.
 }
 void GrainBrainAudioProcessorEditor::paint(juce::Graphics& g){
  g.fillAll(juce::Colour(0xff111622));g.setColour(juce::Colour(0xff25384a));
