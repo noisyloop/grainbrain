@@ -15,13 +15,27 @@ juce::AudioProcessorValueTreeState::ParameterLayout GrainBrainAudioProcessor::ma
  add("filterMode","Filter type (0 LP 1 HP 2 BP 3 Formant)",0,3,0);
  add("filterMotion","Filter LFO depth",0,1,0);
  add("glitch","Glitch amount",0,1,0);
+ add("freeze","Freeze grain position",0,1,0);
+ add("delayMix","Ambient delay wet",0,1,0);
+ add("delayFeedback","Ambient delay feedback",0,.85f,.35f);
+ add("seqOn","Glitch sequencer enabled",0,1,0);
+ add("seqDepth","Sequencer amount",0,1,.65f);
+ add("joyRecord","Joystick record",0,1,0);
+ add("joyPlay","Joystick loop playback",0,1,0);
  add("joyX","Brain Joystick X",0,1,.5f);add("joyY","Brain Joystick Y",0,1,.5f);
  for(int i=0;i<16;++i){juce::String id="joyRoute"+juce::String(i);p.add(std::make_unique<P>(juce::ParameterID{id,1},"Joystick route "+juce::String(i+1),juce::NormalisableRange<float>(0,2,1),0));}
  return p;
 }
 GrainBrainAudioProcessor::GrainBrainAudioProcessor():AudioProcessor(BusesProperties().withOutput("Output",juce::AudioChannelSet::stereo(),true)),params(*this,nullptr,"PARAMETERS",makeLayout()){useFactoryWave();}
 bool GrainBrainAudioProcessor::isBusesLayoutSupported(const BusesLayout& b) const{return b.getMainOutputChannelSet()==juce::AudioChannelSet::stereo();}
-void GrainBrainAudioProcessor::prepareToPlay(double sr,int){sampleRateHz=sr;for(auto& g:grains)g.active=false;for(auto& n:notes)n.active=false;filterLP={0,0};filterBP={0,0};glitchCounter=0;glitchHeld={0,0};}
+void GrainBrainAudioProcessor::prepareToPlay(double sr,int){
+ sampleRateHz=juce::jmax(1.0,sr);
+ for(auto& g:grains)g.active=false;
+ for(auto& n:notes)n.active=false;
+ filterLP={0,0};filterBP={0,0};glitchCounter=0;glitchHeld={0,0};
+ delayLine.setSize(2,juce::jmax(1,int(sr*2.0)));delayLine.clear();delayIndex=0;
+ sequencePhase=0;sequenceStep=-1;joyCaptureClock=0;joyPlaybackPosition=0;
+}
 float GrainBrainAudioProcessor::random01(){return std::generate_canonical<float,24>(rng);}
 void GrainBrainAudioProcessor::useFactoryWave(){
  juce::ScopedLock lock(sampleLock);const int n=88200;sample.setSize(1,n);
@@ -66,8 +80,23 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
   return juce::jlimit(minV[i],maxV[i],base+(axis-.5f)*(maxV[i]-minV[i])*.85f);
  };
 
+ const bool freeze=get("freeze")>.5f;
+ const float delayWet=get("delayMix"),feedback=get("delayFeedback");
+ const bool sequenceEnabled=get("seqOn")>.5f;
+ const float sequenceDepth=get("seqDepth");
+ const bool recording=get("joyRecord")>.5f, playing=get("joyPlay")>.5f;
  float size=effective(0),density=effective(1),pos=effective(2),spray=effective(3),pitch=effective(4),pitchRand=effective(5),reverse=effective(6),spread=effective(7),gain=effective(8),rate=effective(9),depth=effective(10);
  float cutoff=effective(11),resonance=effective(12),filterMode=effective(13),filterMotion=effective(14),glitch=effective(15);
+ if(auto* playHead=getPlayHead()){
+  if(auto posInfo=playHead->getPosition()){
+   if(auto bpm=posInfo->getBpm())currentBpm=juce::jlimit(30.f,300.f,float(*bpm));
+  }
+ }
+ // Capture XY at 30 Hz while recording, and loop it automatically in audio playback.
+ if(recording && !wasRecording){joyRecordedCount=0;joyCaptureClock=0;recordedProgress.store(0);}
+ wasRecording=recording;
+ if(playing && !wasPlaying)joyPlaybackPosition=0;
+ wasPlaying=playing;
  int n=sample.getNumSamples();if(n<16)return;
  juce::MidiBuffer::Iterator events(midi);juce::MidiMessage msg;int eventPos=0;bool hasEvent=events.getNextEvent(msg,eventPos);
  for(int i=0;i<out.getNumSamples();++i){
@@ -78,8 +107,30 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
    else if(msg.isAllNotesOff()||msg.isAllSoundOff()){for(auto& x:notes)x.active=false;}
    hasEvent=events.getNextEvent(msg,eventPos);
   }
-  float modPos=juce::jlimit(0.f,1.f,pos+float(std::sin(lfoPhase*2*pi))*depth*.5f);lfoPhase+=rate/sampleRateHz;if(lfoPhase>=1)lfoPhase-=1;
-  for(auto& note:notes)if(note.active){note.spawnClock+=density/sampleRateHz;if(note.spawnClock>=1){note.spawnClock-=1;startGrain(note,modPos,spray,size,pitch,pitchRand,reverse,spread);}}
+  float playX=joyX,playY=joyY;
+  if(recording && joyRecordedCount<(int)joyRecording.size()){
+   joyCaptureClock+=30.0/sampleRateHz;
+   if(joyCaptureClock>=1.0){joyCaptureClock-=1.0;joyRecording[joyRecordedCount++]={joyX,joyY};recordedProgress.store(float(joyRecordedCount)/float(joyRecording.size()));}
+  }
+  if(playing && joyRecordedCount>1){
+   auto frame=int(joyPlaybackPosition)%joyRecordedCount;
+   playX=joyRecording[frame][0];playY=joyRecording[frame][1];
+   joyPlaybackPosition+=30.0/sampleRateHz;
+   if(joyPlaybackPosition>=joyRecordedCount)joyPlaybackPosition-=joyRecordedCount;
+  }
+  float modPos=juce::jlimit(0.f,1.f,pos+float(std::sin(lfoPhase*2*pi))*depth*.5f);
+  if(freeze)modPos=float(freezePosition);else freezePosition=modPos;
+  lfoPhase+=rate/sampleRateHz;if(lfoPhase>=1)lfoPhase-=1;
+  float seqGlitch=0.f,seqPitch=0.f;
+  if(sequenceEnabled){
+   constexpr int pattern[16]={1,0,0,1,0,1,0,0,1,1,0,0,1,0,1,0};
+   sequencePhase+=currentBpm*4.0/(60.0*sampleRateHz);
+   if(sequencePhase>=16.0)sequencePhase-=16.0;
+   const int newStep=int(sequencePhase);
+   if(newStep!=sequenceStep)sequenceStep=newStep;
+   if(pattern[newStep]){seqGlitch=sequenceDepth;seqPitch=(newStep%4==0?12.f:0.f)*sequenceDepth;}
+  }
+  for(auto& note:notes)if(note.active){note.spawnClock+=density/sampleRateHz;if(note.spawnClock>=1){note.spawnClock-=1;startGrain(note,modPos,spray,size,pitch+seqPitch,pitchRand,reverse,spread);}}
   float left=0,right=0;
   for(auto& g:grains)if(g.active){
    double wrapped=std::fmod(g.position,double(n));if(wrapped<0)wrapped+=n;int a=int(wrapped),b=(a+1)%n;
@@ -101,16 +152,41 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
    channels[ch]=mode==0?filterLP[ch]:mode==1?hp:mode==2?filterBP[ch]:(filterBP[ch]*.75f+filterLP[ch]*.25f);
   }
   // Sample-and-hold / stutter glitch, deterministic in a held sample period.
-  if(glitch>.001f){
-   const int interval=juce::jmax(2,int(sampleRateHz/(12.f+glitch*125.f)));
+  const float liveGlitch=juce::jlimit(0.f,1.f,glitch+seqGlitch);
+  if(liveGlitch>.001f){
+   const int interval=juce::jmax(2,int(sampleRateHz/(12.f+liveGlitch*125.f)));
    if(++glitchCounter>=interval){glitchCounter=0;glitchHeld={channels[0],channels[1]};}
-   const float mix=glitch*.85f;
+   const float mix=liveGlitch*.85f;
    channels[0]=channels[0]*(1.f-mix)+glitchHeld[0]*mix;
    channels[1]=channels[1]*(1.f-mix)+glitchHeld[1]*mix;
   }else glitchCounter=0;
-  out.setSample(0,i,std::tanh(channels[0]*gain*.35f));out.setSample(1,i,std::tanh(channels[1]*gain*.35f));
+  if(delayLine.getNumSamples()>0){
+   const int length=delayLine.getNumSamples();
+   const int taps=juce::jlimit(1,length-1,int(sampleRateHz*60.0/(currentBpm*2.0)));
+   const int read=(delayIndex+length-taps)%length;
+   for(int ch=0;ch<2;++ch){
+    const float echo=delayLine.getSample(ch,read);
+    const float clean=std::tanh(channels[ch]*gain*.35f);
+    delayLine.setSample(ch,delayIndex,std::tanh(clean+echo*feedback));
+    channels[ch]=clean*(1.f-delayWet)+echo*delayWet;
+   }
+   if(++delayIndex>=length)delayIndex=0;
+  }else for(auto& ch:channels)ch=std::tanh(ch*gain*.35f);
+  out.setSample(0,i,channels[0]);out.setSample(1,i,channels[1]);
+ }
+ for(size_t k=0;k<visualPosition.size();++k){
+  const auto& gr=grains[k*8];
+  visualPosition[k].store(gr.active?float(gr.position/juce::jmax(1,n)):0.f,std::memory_order_relaxed);
+  visualPan[k].store(gr.pan,std::memory_order_relaxed);
+  visualEnergy[k].store(gr.active?gr.amp*float(1.0-double(gr.age)/juce::jmax(1,gr.length)):0.f,std::memory_order_relaxed);
  }
 }
+std::array<GrainBrainAudioProcessor::GrainVisual,32> GrainBrainAudioProcessor::getGrainVisuals() const {
+ std::array<GrainVisual,32> visuals{};
+ for(size_t i=0;i<visuals.size();++i)visuals[i]={visualPosition[i].load(std::memory_order_relaxed),visualPan[i].load(std::memory_order_relaxed),visualEnergy[i].load(std::memory_order_relaxed)};
+ return visuals;
+}
+float GrainBrainAudioProcessor::getRecordedJoystickProgress() const{return recordedProgress.load();}
 void GrainBrainAudioProcessor::applyPreset(int index){
  // Classic (0-4), Motion (5-8), Pro (9-12). All banks are free and editable.
  const float presets[][11]={
