@@ -216,6 +216,18 @@ void GrainBrainAudioProcessor::applyPreset(int index){
  const char* extraIds[]={"cutoff","resonance","filterMode","filterMotion","glitch"};
  const float extras[][5]={{14000,.3f,0,0,0},{4800,.5f,0,.15f,0},{9000,.7f,2,.45f,.7f},{1800,.65f,3,.3f,0},{12000,.3f,1,0,.15f},{4500,.6f,0,.65f,0},{7500,.45f,1,.7f,.35f},{3200,.8f,2,.8f,.2f},{1900,.6f,3,.9f,0},{4200,.85f,3,.95f,.3f},{2600,.7f,2,1.f,.7f},{1400,1.f,3,1.f,.45f},{6000,.95f,1,1.f,.9f}};
  for(int i=0;i<5;++i){auto* p=params.getParameter(extraIds[i]);p->setValueNotifyingHost(p->convertTo0to1(extras[index][i]));}
+ // The advanced factory patches activate the new performance and atmosphere sections.
+ const char* fxIds[]={"freeze","delayMix","delayFeedback","seqOn","seqDepth","joyRecord","joyPlay"};
+ const float advanced[][5]={
+  {0,.0f,.35f,0,.55f},{0,.12f,.38f,0,.45f},{0,.18f,.43f,1,.8f},
+  {0,.38f,.55f,0,.5f},{0,.08f,.3f,0,.55f},{0,.3f,.6f,0,.5f},
+  {0,.18f,.38f,1,.6f},{0,.4f,.55f,0,.6f},{1,.5f,.68f,0,.5f},
+  {0,.48f,.65f,1,.8f},{0,.16f,.48f,1,1.f},{1,.55f,.7f,0,.65f},{0,.28f,.6f,1,1.f}
+ };
+ for(int i=0;i<7;++i){
+  float v=i<5?advanced[index][i]:0.f;
+  if(auto* p=params.getParameter(fxIds[i]))p->setValueNotifyingHost(p->convertTo0to1(v));
+ }
  // Factory patch joystick routing: Classic stays neutral; Motion and Pro expose performance macros.
  for(int i=0;i<16;++i){
   float axis=0.f;
