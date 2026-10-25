@@ -29,6 +29,12 @@ private:
  juce::TextButton clearRoutes{"CLEAR LINKS"},freezeButton{"FREEZE"},recordButton{"REC XY"},playButton{"LOOP XY"},seqButton{"GLITCH STEPS"},resetJoyButton{"CENTER XY"};
  juce::TextButton storeA{"SAVE A"},storeB{"SAVE B"},recallA{"LOAD A"},recallB{"LOAD B"};
  juce::MemoryBlock snapshotA,snapshotB;
+ juce::TextButton randomButton{"RANDOMIZE"},randomSafeButton{"RANDOMIZE TIME"},vowelPresetButton{"VOWEL MORPH"};
+ juce::ComboBox beatDivisionBox,lfoDivisionBox,filterModeBox;
+ juce::Slider randomAmount, timeMorphKnob, vowelKnob, vowelShiftKnob;
+ juce::Label randomLabel,timeLabel,vowelLabel,shiftLabel,beatLabel,lfoBeatLabel,modeLabel;
+ std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment>> comboAttachments;
+ std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>> newAttachments;
  juce::Slider delayMixKnob,delayFeedbackKnob,seqDepthKnob;
  std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> delayMixAttachment,delayFeedbackAttachment,seqDepthAttachment;
  juce::Label delayLabel,feedbackLabel,seqLabel;
