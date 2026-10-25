@@ -106,10 +106,14 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
   }
  }
  // Capture XY at 30 Hz while recording, and loop it automatically in audio playback.
- if(recording && !wasRecording){joyRecordedCount=0;joyCaptureClock=0;recordedProgress.store(0);}
- wasRecording=recording;
- if(playing && !wasPlaying)joyPlaybackPosition=0;
- wasPlaying=playing;
+ // Never block the audio thread while a host or preset snapshots the performance.
+ juce::ScopedTryLock recordingLock(joyRecordingLock);
+ if(recordingLock.isLocked()){
+  if(recording && !wasRecording){joyRecordedCount=0;joyCaptureClock=0;recordedProgress.store(0);}
+  wasRecording=recording;
+  if(playing && !wasPlaying)joyPlaybackPosition=0;
+  wasPlaying=playing;
+ }
  int n=sample.getNumSamples();if(n<16)return;
  // Precompute vowel resonator coefficients once per block instead of per audio sample.
  constexpr float vowelTable[5][3]={{800,1150,2900},{400,1700,2600},{350,2100,3000},{450,800,2830},{325,700,2530}};
@@ -133,11 +137,11 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
    hasEvent=events.getNextEvent(msg,eventPos);
   }
   float playX=joyX,playY=joyY;
-  if(recording && joyRecordedCount<(int)joyRecording.size()){
+  if(recordingLock.isLocked() && recording && joyRecordedCount<(int)joyRecording.size()){
    joyCaptureClock+=30.0/sampleRateHz;
    if(joyCaptureClock>=1.0){joyCaptureClock-=1.0;joyRecording[joyRecordedCount++]={joyX,joyY};recordedProgress.store(float(joyRecordedCount)/float(joyRecording.size()));}
   }
-  if(playing && joyRecordedCount>1){
+  if(recordingLock.isLocked() && playing && joyRecordedCount>1){
    auto frame=int(joyPlaybackPosition)%joyRecordedCount;
    playX=joyRecording[frame][0];playY=joyRecording[frame][1];
    joyPlaybackPosition+=30.0/sampleRateHz;
@@ -304,8 +308,60 @@ bool GrainBrainAudioProcessor::loadUserPreset(const juce::File& file) {
  setStateInformation(data.getData(), (int)data.getSize());
  return true;
 }
-void GrainBrainAudioProcessor::getStateInformation(juce::MemoryBlock& b){auto state=params.copyState();std::unique_ptr<juce::XmlElement> xml(state.createXml());copyXmlToBinary(*xml,b);}
-void GrainBrainAudioProcessor::setStateInformation(const void* data,int size){std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data,size));if(xml&&xml->hasTagName(params.state.getType()))params.replaceState(juce::ValueTree::fromXml(*xml));}
+void GrainBrainAudioProcessor::getStateInformation(juce::MemoryBlock& b){
+ auto state=params.copyState();
+ std::unique_ptr<juce::XmlElement> xml(state.createXml());
+ // Append a compact recording to the established preset/session XML format.
+ // This keeps old .gbpreset files readable, without modifying any UI or controls.
+ {
+  juce::ScopedLock lock(joyRecordingLock);
+  juce::MemoryOutputStream stream;
+  const int count=juce::jlimit(0,int(joyRecording.size()),joyRecordedCount);
+  for(int i=0;i<count;++i){
+   stream.writeFloat(joyRecording[size_t(i)][0]);
+   stream.writeFloat(joyRecording[size_t(i)][1]);
+  }
+  auto* child=xml->createNewChildElement("JoystickRecording");
+  child->setAttribute("version",1);
+  child->setAttribute("frames",count);
+  child->setAttribute("xy",stream.getMemoryBlock().toBase64Encoding());
+ }
+ copyXmlToBinary(*xml,b);
+}
+void GrainBrainAudioProcessor::setStateInformation(const void* data,int size){
+ std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data,size));
+ if(!xml||!xml->hasTagName(params.state.getType()))return;
+ std::array<std::array<float,2>,1024> restored{};
+ int count=0;
+ if(auto* child=xml->getChildByName("JoystickRecording")){
+  const int n=child->getIntAttribute("frames",-1);
+  juce::MemoryBlock payload;
+  if(child->getIntAttribute("version")==1 && n>=0 && n<=int(restored.size())
+     && payload.fromBase64Encoding(child->getStringAttribute("xy"))
+     && payload.getSize()==size_t(n)*2u*sizeof(float)){
+   juce::MemoryInputStream input(payload,false);
+   bool valid=true;
+   for(int i=0;i<n;++i){
+    const float x=input.readFloat(),y=input.readFloat();
+    if(!std::isfinite(x)||!std::isfinite(y)||x<0.f||x>1.f||y<0.f||y>1.f){valid=false;break;}
+    restored[size_t(i)]={x,y};
+   }
+   if(valid)count=n;
+  }
+  xml->removeChildElement(child,true);
+ }
+ // Old presets have no recording; clear any previous performance instead of leaking it into the patch.
+ {
+  juce::ScopedLock lock(joyRecordingLock);
+  joyRecording=restored;
+  joyRecordedCount=count;
+  joyCaptureClock=0;
+  joyPlaybackPosition=0;
+  wasRecording=false;wasPlaying=false;
+  recordedProgress.store(float(count)/float(restored.size()));
+ }
+ params.replaceState(juce::ValueTree::fromXml(*xml));
+}
 juce::AudioProcessorEditor* GrainBrainAudioProcessor::createEditor(){return new GrainBrainAudioProcessorEditor(*this);}
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter(){return new GrainBrainAudioProcessor();}
 
