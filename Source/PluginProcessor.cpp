@@ -134,6 +134,18 @@ void GrainBrainAudioProcessor::applyPreset(int index){
  const char* extraIds[]={"cutoff","resonance","filterMode","filterMotion","glitch"};
  const float extras[][5]={{14000,.3f,0,0,0},{4800,.5f,0,.15f,0},{9000,.7f,2,.45f,.7f},{1800,.65f,3,.3f,0},{12000,.3f,1,0,.15f},{4500,.6f,0,.65f,0},{7500,.45f,1,.7f,.35f},{3200,.8f,2,.8f,.2f},{1900,.6f,3,.9f,0},{4200,.85f,3,.95f,.3f},{2600,.7f,2,1.f,.7f},{1400,1.f,3,1.f,.45f},{6000,.95f,1,1.f,.9f}};
  for(int i=0;i<5;++i){auto* p=params.getParameter(extraIds[i]);p->setValueNotifyingHost(p->convertTo0to1(extras[index][i]));}
+ // Factory patch joystick routing: Classic stays neutral; Motion and Pro expose performance macros.
+ for(int i=0;i<16;++i){
+  float axis=0.f;
+  if(index>=5&&index<=8){
+   if(i==2||i==11)axis=1.f; // X: sample position and filter
+   if(i==1||i==15)axis=2.f; // Y: density and glitch
+  }else if(index>=9){
+   if(i==2||i==3||i==11||i==13)axis=1.f; // X: texture and timbre
+   if(i==0||i==1||i==7||i==15)axis=2.f; // Y: clouds, width, stutter
+  }
+  if(auto* p=params.getParameter("joyRoute"+juce::String(i)))p->setValueNotifyingHost(p->convertTo0to1(axis));
+ }
 }
 bool GrainBrainAudioProcessor::saveUserPreset(const juce::File& file) {
  juce::MemoryBlock data; getStateInformation(data);
