@@ -75,7 +75,7 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
  auto get=[&](const char* id){return params.getRawParameterValue(id)->load();};
  const char* targets[]={"size","density","position","spray","pitch","pitchRand","reverse","spread","gain","lfoRate","lfoDepth","cutoff","resonance","filterMode","filterMotion","glitch"};
  const float minV[]={15,1,0,0,-24,0,0,0,0,.02f,0,80,.1f,0,0,0};
- const float maxV[]={500,70,1,1,24,12,1,1,1,15,1,18000,1.4f,3,1,1};
+ const float maxV[]={500,70,1,1,24,12,1,1,1,15,1,18000,1.4f,4,1,1};
  std::array<float,16> baseValues{},routes{};
  for(int k=0;k<16;++k){
   baseValues[k]=get(targets[k]);
@@ -253,7 +253,7 @@ void GrainBrainAudioProcessor::applyPreset(int index){
  const char* ids[]={"size","density","position","spray","pitch","pitchRand","reverse","spread","gain","lfoRate","lfoDepth"};
  for(int i=0;i<11;++i){auto* p=params.getParameter(ids[i]);p->setValueNotifyingHost(p->convertTo0to1(presets[index][i]));}
  const char* extraIds[]={"cutoff","resonance","filterMode","filterMotion","glitch"};
- const float extras[][5]={{14000,.3f,0,0,0},{4800,.5f,0,.15f,0},{9000,.7f,2,.45f,.7f},{1800,.65f,3,.3f,0},{12000,.3f,1,0,.15f},{4500,.6f,0,.65f,0},{7500,.45f,1,.7f,.35f},{3200,.8f,2,.8f,.2f},{1900,.6f,3,.9f,0},{4200,.85f,3,.95f,.3f},{2600,.7f,2,1.f,.7f},{1400,1.f,3,1.f,.45f},{6000,.95f,1,1.f,.9f}};
+ const float extras[][5]={{14000,.3f,0,0,0},{4800,.5f,0,.15f,0},{9000,.7f,2,.45f,.7f},{1800,.65f,4,.3f,0},{12000,.3f,1,0,.15f},{4500,.6f,0,.65f,0},{7500,.45f,1,.7f,.35f},{3200,.8f,2,.8f,.2f},{1900,.6f,4,.9f,0},{4200,.85f,4,.95f,.3f},{2600,.7f,2,1.f,.7f},{1400,1.f,4,1.f,.45f},{6000,.95f,1,1.f,.9f}};
  for(int i=0;i<5;++i){auto* p=params.getParameter(extraIds[i]);p->setValueNotifyingHost(p->convertTo0to1(extras[index][i]));}
  if(auto* p=params.getParameter("vowel"))p->setValueNotifyingHost(p->convertTo0to1(float(index%5)));
  if(auto* p=params.getParameter("seqDivision"))p->setValueNotifyingHost(p->convertTo0to1(float(index>=9?4:3)));
