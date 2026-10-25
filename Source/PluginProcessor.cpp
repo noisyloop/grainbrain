@@ -86,6 +86,8 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
 
  float size=effective(0),density=effective(1),pos=effective(2),spray=effective(3),pitch=effective(4),pitchRand=effective(5),reverse=effective(6),spread=effective(7),gain=effective(8),rate=effective(9),depth=effective(10);
  float cutoff=effective(11),resonance=effective(12),filterMode=effective(13),filterMotion=effective(14),glitch=effective(15);
+ const bool freeze=get("freeze")>.5f,recording=get("joyRecord")>.5f,playing=get("joyPlay")>.5f,sequenceEnabled=get("seqOn")>.5f;
+ const float delayWet=get("delayMix"),feedback=get("delayFeedback"),sequenceDepth=get("seqDepth");
  if(auto* playHead=getPlayHead()){
   if(auto posInfo=playHead->getPosition()){
    if(auto bpm=posInfo->getBpm())currentBpm=juce::jlimit(30.f,300.f,float(*bpm));
