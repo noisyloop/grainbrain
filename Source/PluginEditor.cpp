@@ -1,5 +1,7 @@
 #include "PluginEditor.h"
-GrainBrainAudioProcessorEditor::GrainBrainAudioProcessorEditor(GrainBrainAudioProcessor& p):AudioProcessorEditor(&p),processor(p){
+#include <cmath>
+GrainBrainAudioProcessorEditor::GrainBrainAudioProcessorEditor(GrainBrainAudioProcessor& p):AudioProcessorEditor(&p),processor(p),orb(p.params){
+ addAndMakeVisible(orb);
  heading.setText("GRAIN BRAIN / GRANULAR RANDOMIZER",juce::dontSendNotification);
  heading.setFont(juce::Font(juce::FontOptions(23.0f).withStyle("Bold")));
  heading.setColour(juce::Label::textColourId,juce::Colours::white);addAndMakeVisible(heading);
@@ -30,9 +32,9 @@ GrainBrainAudioProcessorEditor::GrainBrainAudioProcessorEditor(GrainBrainAudioPr
   chooser=std::make_unique<juce::FileChooser>("Open GrainBrain preset",directory,"*.gbpreset");
   chooser->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectFiles,[this](const juce::FileChooser& c){auto f=c.getResult();if(f.existsAsFile())sampleLabel.setText(processor.loadUserPreset(f)?"Loaded: "+f.getFileName():"Invalid preset",juce::dontSendNotification);});
  };
- const char* ids[]={"size","density","position","spray","pitch","pitchRand","reverse","spread","gain","lfoRate","lfoDepth"};
- const char* names[]={"SIZE ms","DENSITY","POSITION","SPRAY","PITCH","PITCH RAND","REVERSE","STEREO","GAIN","LFO RATE","LFO DEPTH"};
- for(int i=0;i<11;++i){
+ const char* ids[]={"size","density","position","spray","pitch","pitchRand","reverse","spread","gain","lfoRate","lfoDepth","cutoff","resonance","filterMode","filterMotion","glitch"};
+ const char* names[]={"SIZE ms","DENSITY","POSITION","SPRAY","PITCH","PITCH RAND","REVERSE","STEREO","GAIN","LFO RATE","LFO DEPTH","FILTER Hz","RESONANCE","FILTER TYPE","FILTER MOTION","GLITCH"};
+ for(int i=0;i<16;++i){
   auto s=std::make_unique<juce::Slider>();s->setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
   s->setTextBoxStyle(juce::Slider::TextBoxBelow,false,75,18);
   s->setColour(juce::Slider::rotarySliderFillColourId,juce::Colour(0xff8af0cb));s->setColour(juce::Slider::thumbColourId,juce::Colours::white);
@@ -42,7 +44,7 @@ GrainBrainAudioProcessorEditor::GrainBrainAudioProcessorEditor(GrainBrainAudioPr
   auto l=std::make_unique<juce::Label>();l->setText(names[i],juce::dontSendNotification);l->setJustificationType(juce::Justification::centred);
   l->setColour(juce::Label::textColourId,juce::Colours::white);addAndMakeVisible(*l);labels.push_back(std::move(l));
  }
- setSize(780,490); // resized() accesses sliders/labels: initialize them first.
+ setSize(980,720); // All child controls exist before resized() runs.
 }
 void GrainBrainAudioProcessorEditor::paint(juce::Graphics& g){
  g.fillAll(juce::Colour(0xff111622));g.setColour(juce::Colour(0xff25384a));
@@ -50,16 +52,47 @@ void GrainBrainAudioProcessorEditor::paint(juce::Graphics& g){
  g.setColour(juce::Colour(0xff283444));g.drawRoundedRectangle(16,85,float(getWidth()-32),55,10,1);
 }
 void GrainBrainAudioProcessorEditor::resized(){
- heading.setBounds(20,14,550,42);presetBox.setBounds(580,25,180,28);
+ heading.setBounds(20,14,560,42);presetBox.setBounds(730,25,225,28);
  loadButton.setBounds(25,96,130,32);factoryButton.setBounds(165,96,130,32);
  saveButton.setBounds(305,96,130,32);openButton.setBounds(445,96,130,32);
- sampleLabel.setBounds(585,96,170,32);helpLabel.setBounds(25,450,720,24);
- for(int i=0;i<11;++i){int col=i%6,row=i/6;int x=18+col*125,y=165+row*140;
-  sliders[i]->setBounds(x,y,115,105);labels[i]->setBounds(x,y+104,115,24);}
+ sampleLabel.setBounds(585,96,360,32);helpLabel.setBounds(25,676,920,24);
+ orb.setBounds(345,162,290,290);
+ for(int i=0;i<16;++i){int x=0,y=0;
+  if(i<6){x=15+(i%3)*108;y=165+(i/3)*148;}
+  else if(i<12){x=655+((i-6)%3)*108;y=165+((i-6)/3)*148;}
+  else {x=135+((i-12)%4)*178;y=505;}
+  sliders[i]->setBounds(x,y,100,96);labels[i]->setBounds(x-5,y+95,110,22);
+ }
 }
 bool GrainBrainAudioProcessorEditor::isInterestedInFileDrag(const juce::StringArray& files){
  for(auto& f:files)if(juce::File(f).hasFileExtension("wav;aif;aiff"))return true;return false;
 }
 void GrainBrainAudioProcessorEditor::filesDropped(const juce::StringArray& files,int,int){
  if(!files.isEmpty()){auto f=juce::File(files[0]);sampleLabel.setText(processor.loadSample(f)?processor.getSampleName():"Invalid audio file",juce::dontSendNotification);}
+}
+
+void GrainBrainOrb::paint(juce::Graphics& g){
+ auto area=getLocalBounds().toFloat().reduced(12.f);
+ const auto cx=area.getCentreX(),cy=area.getCentreY(),r=juce::jmin(area.getWidth(),area.getHeight())*.45f;
+ g.setColour(juce::Colour(0xff202f46));g.fillEllipse(cx-r,cy-r,2*r,2*r);
+ g.setColour(juce::Colour(0xff38546b));g.drawEllipse(cx-r,cy-r,2*r,2*r,2.f);
+ for(int i=1;i<=3;++i){float rr=r*i/4.f;g.setColour(juce::Colour(0x443fb8af));g.drawEllipse(cx-rr,cy-rr,2*rr,2*rr,1.f);}
+ auto raw=[&](const char* id){return params.getRawParameterValue(id)->load();};
+ float x=juce::jlimit(0.f,1.f,raw("position"));
+ float freq=juce::jlimit(80.f,18000.f,raw("cutoff"));
+ float y=juce::jlimit(0.f,1.f,std::log(freq/80.f)/std::log(18000.f/80.f));
+ float px=cx+(x-.5f)*2.f*r*.84f,py=cy+(.5f-y)*2.f*r*.84f;
+ g.setColour(juce::Colour(0x558af0cb));g.drawLine(cx,cy,px,py,2.f);
+ juce::ColourGradient gradient(juce::Colour(0xffa8ffdc),px-12,py-12,juce::Colour(0xff1687ab),px+24,py+24,false);
+ g.setGradientFill(gradient);g.fillEllipse(px-15,py-15,30,30);
+ g.setColour(juce::Colours::white);g.drawEllipse(px-15,py-15,30,30,1.5f);
+ g.setColour(juce::Colours::lightgrey);g.setFont(12.f);g.drawFittedText("XY ORB  /  POSITION + FILTER",getLocalBounds().removeFromBottom(20),juce::Justification::centred,1);
+}
+void GrainBrainOrb::mouseDrag(const juce::MouseEvent& e){
+ const float radius=juce::jmin(getWidth(),getHeight())*.45f*.84f;
+ const float x=juce::jlimit(0.f,1.f,.5f+(e.position.x-getWidth()*.5f)/(2.f*radius));
+ const float y=juce::jlimit(0.f,1.f,.5f-(e.position.y-getHeight()*.5f)/(2.f*radius));
+ auto set=[&](const char* id,float value){if(auto* p=params.getParameter(id)){p->beginChangeGesture();p->setValueNotifyingHost(p->convertTo0to1(value));p->endChangeGesture();}};
+ set("position",x);set("cutoff",80.f*std::pow(18000.f/80.f,y));
+ repaint();
 }
