@@ -1,5 +1,15 @@
 #pragma once
 #include "PluginProcessor.h"
+class GrainBrainOrb : public juce::Component, private juce::Timer {
+public:
+ explicit GrainBrainOrb(juce::AudioProcessorValueTreeState& p):params(p){startTimerHz(30);}
+ void paint(juce::Graphics&) override;
+ void mouseDown(const juce::MouseEvent& e) override {mouseDrag(e);}
+ void mouseDrag(const juce::MouseEvent&) override;
+private:
+ void timerCallback() override {repaint();}
+ juce::AudioProcessorValueTreeState& params;
+};
 class GrainBrainAudioProcessorEditor : public juce::AudioProcessorEditor, public juce::FileDragAndDropTarget {
 public:
  explicit GrainBrainAudioProcessorEditor(GrainBrainAudioProcessor&);
@@ -9,6 +19,7 @@ public:
  void filesDropped(const juce::StringArray&,int,int) override;
 private:
  GrainBrainAudioProcessor& processor;
+ GrainBrainOrb orb;
  juce::Label heading,sampleLabel,helpLabel;
  juce::TextButton loadButton{"LOAD SAMPLE"},factoryButton{"FACTORY WAVE"},saveButton{"SAVE PRESET"},openButton{"OPEN PRESET"};
  juce::ComboBox presetBox;
