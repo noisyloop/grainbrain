@@ -2,7 +2,7 @@
 #include "PluginProcessor.h"
 class GrainBrainOrb : public juce::Component, public juce::DragAndDropTarget, private juce::Timer {
 public:
- explicit GrainBrainOrb(juce::AudioProcessorValueTreeState& p):params(p){startTimerHz(30);}
+ explicit GrainBrainOrb(GrainBrainAudioProcessor& p):processor(p),params(p.params){startTimerHz(30);}
  void paint(juce::Graphics&) override;
  void mouseDown(const juce::MouseEvent& e) override {mouseDrag(e);}
  void mouseDrag(const juce::MouseEvent&) override;
@@ -12,6 +12,7 @@ public:
  void itemDragExit(const SourceDetails&) override {dragHighlight=false;repaint();}
 private:
  void timerCallback() override {repaint();}
+ GrainBrainAudioProcessor& processor;
  juce::AudioProcessorValueTreeState& params;
  bool dragHighlight=false;
 };
@@ -25,7 +26,11 @@ public:
 private:
  GrainBrainAudioProcessor& processor;
  GrainBrainOrb orb;
- juce::TextButton clearRoutes{"CLEAR LINKS"};
+ juce::TextButton clearRoutes{"CLEAR LINKS"},freezeButton{"FREEZE"},recordButton{"REC XY"},playButton{"LOOP XY"},seqButton{"GLITCH STEPS"},resetJoyButton{"CENTER XY"};
+ juce::Slider delayMixKnob,delayFeedbackKnob,seqDepthKnob;
+ std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> delayMixAttachment,delayFeedbackAttachment,seqDepthAttachment;
+ juce::Label delayLabel,feedbackLabel,seqLabel;
+
  juce::Label heading,sampleLabel,helpLabel;
  juce::TextButton loadButton{"LOAD SAMPLE"},factoryButton{"FACTORY WAVE"},saveButton{"SAVE PRESET"},openButton{"OPEN PRESET"};
  juce::ComboBox presetBox;
