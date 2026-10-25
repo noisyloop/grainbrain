@@ -1,8 +1,28 @@
 #include "PluginEditor.h"
 #include <cmath>
-GrainBrainAudioProcessorEditor::GrainBrainAudioProcessorEditor(GrainBrainAudioProcessor& p):AudioProcessorEditor(&p),processor(p),orb(p.params){
+GrainBrainAudioProcessorEditor::GrainBrainAudioProcessorEditor(GrainBrainAudioProcessor& p):AudioProcessorEditor(&p),processor(p),orb(p){
  addAndMakeVisible(orb);
  addAndMakeVisible(clearRoutes);
+ for(auto* b:{&freezeButton,&recordButton,&playButton,&seqButton,&resetJoyButton})addAndMakeVisible(*b);
+ auto toggle=[this](const char* id){if(auto* par=processor.params.getParameter(id))par->setValueNotifyingHost(par->getValue()>.5f?0.f:1.f);};
+ freezeButton.onClick=[toggle]{toggle("freeze");};
+ recordButton.onClick=[toggle]{toggle("joyRecord");};
+ playButton.onClick=[toggle]{toggle("joyPlay");};
+ seqButton.onClick=[toggle]{toggle("seqOn");};
+ resetJoyButton.onClick=[this]{for(const auto* id:{"joyX","joyY"})if(auto* p=processor.params.getParameter(id))p->setValueNotifyingHost(.5f);};
+ auto setDial=[this](juce::Slider& slider,juce::Label& label,const char* title,const char* id,std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>& attachment){
+  slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+  slider.setTextBoxStyle(juce::Slider::TextBoxBelow,false,65,18);
+  slider.setColour(juce::Slider::rotarySliderFillColourId,juce::Colour(0xffa47df3));
+  label.setText(title,juce::dontSendNotification);
+  label.setJustificationType(juce::Justification::centred);
+  label.setColour(juce::Label::textColourId,juce::Colours::white);
+  addAndMakeVisible(slider);addAndMakeVisible(label);
+  attachment=std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(processor.params,id,slider);
+ };
+ setDial(delayMixKnob,delayLabel,"DELAY MIX","delayMix",delayMixAttachment);
+ setDial(delayFeedbackKnob,feedbackLabel,"FEEDBACK","delayFeedback",delayFeedbackAttachment);
+ setDial(seqDepthKnob,seqLabel,"SEQ DEPTH","seqDepth",seqDepthAttachment);
  clearRoutes.onClick=[this]{for(int i=0;i<16;++i)if(auto* p=processor.params.getParameter("joyRoute"+juce::String(i)))p->setValueNotifyingHost(0.f);};
  heading.setText("GRAIN BRAIN / GRANULAR RANDOMIZER",juce::dontSendNotification);
  heading.setFont(juce::Font(juce::FontOptions(23.0f).withStyle("Bold")));
@@ -58,7 +78,7 @@ GrainBrainAudioProcessorEditor::GrainBrainAudioProcessorEditor(GrainBrainAudioPr
   addAndMakeVisible(*handle);
   dragHandles.push_back(std::move(handle));
  }
- setSize(980,720); // All child controls exist before resized() runs.
+ setSize(1100,820); // All child controls exist before resized() runs.
 }
 void GrainBrainAudioProcessorEditor::paint(juce::Graphics& g){
  g.fillAll(juce::Colour(0xff111622));g.setColour(juce::Colour(0xff25384a));
@@ -70,12 +90,12 @@ void GrainBrainAudioProcessorEditor::resized(){
  loadButton.setBounds(25,96,130,32);factoryButton.setBounds(165,96,130,32);
  saveButton.setBounds(305,96,130,32);openButton.setBounds(445,96,130,32);
  sampleLabel.setBounds(585,96,360,32);helpLabel.setBounds(25,676,920,24);
- orb.setBounds(345,162,290,290);
- clearRoutes.setBounds(419,465,150,28);
+ orb.setBounds(380,162,290,290);
+ clearRoutes.setBounds(470,503,150,28);
  for(int i=0;i<16;++i){int x=0,y=0;
-  if(i<6){x=15+(i%3)*108;y=165+(i/3)*148;}
-  else if(i<12){x=655+((i-6)%3)*108;y=165+((i-6)/3)*148;}
-  else {x=135+((i-12)%4)*178;y=505;}
+  if(i<6){x=25+(i%3)*112;y=170+(i/3)*150;}
+  else if(i<12){x=730+((i-6)%3)*112;y=170+((i-6)/3)*150;}
+  else {x=40+((i-12)%2)*112;y=520+((i-12)/2)*130;}
   sliders[i]->setBounds(x,y,100,78);labels[i]->setBounds(x-5,y+78,110,22);dragHandles[i]->setBounds(x+15,y+105,70,21);
  }
 }
@@ -101,6 +121,32 @@ void GrainBrainOrb::paint(juce::Graphics& g){
  juce::ColourGradient gradient(juce::Colour(0xffa8ffdc),px-12,py-12,juce::Colour(0xff1687ab),px+24,py+24,false);
  g.setGradientFill(gradient);g.fillEllipse(px-15,py-15,30,30);
  g.setColour(juce::Colours::white);g.drawEllipse(px-15,py-15,30,30,1.5f);
+ // Show active routing cables, cyan for X and magenta for Y.
+ const juce::String routeNames[]={"SIZE","DENSITY","POSITION","SPRAY","PITCH","PITCH RAND","REVERSE","SPREAD","GAIN","LFO RATE","LFO DEPTH","CUTOFF","RESONANCE","TYPE","MOTION","GLITCH"};
+ int nx=0,ny=0;
+ for(int i=0;i<16;++i){
+  auto id="joyRoute"+juce::String(i);
+  const auto* p=params.getRawParameterValue(id);
+  if(!p)continue;
+  float route=p->load();
+  if(route<.5f)continue;
+  const bool xAxis=route<1.5f;
+  const int slot=xAxis?nx++:ny++;
+  const float yy=55.f+float(slot%8)*23.f;
+  const float tx=xAxis?17.f:float(getWidth()-17);
+  const float startX=xAxis?cx-r*.7f:cx+r*.7f;
+  juce::Path cable;cable.startNewSubPath(startX,cy+(slot%4-2)*11.f);cable.cubicTo(cx+(xAxis?-r:r),yy,tx+ (xAxis?40.f:-40.f),yy,tx,yy);
+  g.setColour(xAxis?juce::Colour(0x8865f7ee):juce::Colour(0x88f38be7));
+  g.strokePath(cable,juce::PathStrokeType(1.15f));
+  g.setFont(9.5f);
+  g.drawFittedText(routeNames[i],juce::Rectangle<int>(xAxis?0:getWidth()-91,int(yy-8),91,16),xAxis?juce::Justification::centredLeft:juce::Justification::centredRight,1);
+ }
+ const auto visual=processor.getGrainVisuals();
+ for(const auto& gr:visual)if(gr.energy>.001f){
+  const float xx=cx+(gr.position-.5f)*r*1.55f, yy=cy-gr.pan*r*.58f;
+  g.setColour(juce::Colour(0xff79f4dd).withAlpha(juce::jlimit(0.f,.85f,gr.energy)));
+  g.fillEllipse(xx-2.f,yy-2.f,4.f,4.f);
+ }
  g.setColour(juce::Colours::lightgrey);g.setFont(12.f);g.drawFittedText("BRAIN JOYSTICK  /  X + Y",getLocalBounds().removeFromBottom(20),juce::Justification::centred,1);
 }
 void GrainBrainOrb::mouseDrag(const juce::MouseEvent& e){
