@@ -28,6 +28,40 @@ GrainBrainAudioProcessorEditor::GrainBrainAudioProcessorEditor(GrainBrainAudioPr
  setDial(delayMixKnob,delayLabel,"DELAY MIX","delayMix",delayMixAttachment);
  setDial(delayFeedbackKnob,feedbackLabel,"FEEDBACK","delayFeedback",delayFeedbackAttachment);
  setDial(seqDepthKnob,seqLabel,"SEQ DEPTH","seqDepth",seqDepthAttachment);
+ for(auto* b:{&randomButton,&randomSafeButton,&lfoSyncButton})addAndMakeVisible(*b);
+ randomAmount.setRange(.05,1.0,.05);randomAmount.setValue(.6,juce::dontSendNotification);
+ randomAmount.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+ randomAmount.setTextBoxStyle(juce::Slider::TextBoxBelow,false,58,18);
+ randomAmount.setColour(juce::Slider::rotarySliderFillColourId,juce::Colour(0xffffbd74));
+ addAndMakeVisible(randomAmount);
+ randomLabel.setText("CHAOS",juce::dontSendNotification);
+ randomLabel.setJustificationType(juce::Justification::centred);
+ randomLabel.setColour(juce::Label::textColourId,juce::Colours::white);addAndMakeVisible(randomLabel);
+ randomButton.onClick=[this]{processor.randomizePatch(float(randomAmount.getValue()),false);};
+ randomSafeButton.onClick=[this]{processor.randomizePatch(float(randomAmount.getValue()),true);};
+ lfoSyncButton.onClick=[toggle]{toggle("lfoSync");};
+ auto setupCombo=[this](juce::ComboBox& combo,juce::Label& label,const char* title,const char* id,const juce::StringArray& choices){
+  for(int i=0;i<choices.size();++i)combo.addItem(choices[i],i+1);
+  addAndMakeVisible(combo);
+  label.setText(title,juce::dontSendNotification);label.setColour(juce::Label::textColourId,juce::Colours::white);
+  label.setJustificationType(juce::Justification::centred);addAndMakeVisible(label);
+  comboAttachments.push_back(std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(processor.params,id,combo));
+ };
+ setupCombo(filterModeBox,modeLabel,"FILTER TYPE","filterMode",{"Low-pass","High-pass","Band-pass","Notch","Vowel bank"});
+ setupCombo(beatDivisionBox,beatLabel,"GLITCH BEAT","seqDivision",{"1/2","1/4","1/8","1/16","1/32","1/64"});
+ setupCombo(lfoDivisionBox,lfoBeatLabel,"LFO BEAT","lfoDivision",{"1/2","1/4","1/8","1/16","1/32","1/64"});
+ auto dial=[this](juce::Slider& slider,juce::Label& label,const char* title,const char* id){
+  slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+  slider.setTextBoxStyle(juce::Slider::TextBoxBelow,false,65,18);
+  slider.setColour(juce::Slider::rotarySliderFillColourId,juce::Colour(0xff8af0cb));
+  label.setText(title,juce::dontSendNotification);label.setColour(juce::Label::textColourId,juce::Colours::white);
+  label.setJustificationType(juce::Justification::centred);
+  addAndMakeVisible(slider);addAndMakeVisible(label);
+  newAttachments.push_back(std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(processor.params,id,slider));
+ };
+ dial(vowelKnob,vowelLabel,"A E I O U","vowel");
+ dial(vowelShiftKnob,shiftLabel,"VOWEL SHIFT","vowelShift");
+ dial(timeMorphKnob,timeLabel,"TIME DRIFT","seqTimeMod");
  clearRoutes.onClick=[this]{for(int i=0;i<16;++i)if(auto* p=processor.params.getParameter("joyRoute"+juce::String(i)))p->setValueNotifyingHost(0.f);};
  heading.setText("GRAIN BRAIN / GRANULAR RANDOMIZER",juce::dontSendNotification);
  heading.setFont(juce::Font(juce::FontOptions(23.0f).withStyle("Bold")));
@@ -83,7 +117,7 @@ GrainBrainAudioProcessorEditor::GrainBrainAudioProcessorEditor(GrainBrainAudioPr
   addAndMakeVisible(*handle);
   dragHandles.push_back(std::move(handle));
  }
- setSize(1100,820); // All child controls exist before resized() runs.
+ setSize(1100,1070); // All child controls exist before resized() runs.
 }
 void GrainBrainAudioProcessorEditor::paint(juce::Graphics& g){
  g.fillAll(juce::Colour(0xff111622));g.setColour(juce::Colour(0xff25384a));
@@ -94,15 +128,32 @@ void GrainBrainAudioProcessorEditor::resized(){
  heading.setBounds(20,14,560,42);presetBox.setBounds(730,25,225,28);
  loadButton.setBounds(25,96,130,32);factoryButton.setBounds(165,96,130,32);
  saveButton.setBounds(305,96,130,32);openButton.setBounds(445,96,130,32);
- sampleLabel.setBounds(585,96,360,32);helpLabel.setBounds(25,676,920,24);
- orb.setBounds(380,162,290,290);
- clearRoutes.setBounds(470,503,150,28);
+ sampleLabel.setBounds(585,96,360,32);helpLabel.setBounds(25,1025,1040,24);
+ orb.setBounds(380,162,290,290);clearRoutes.setBounds(470,503,150,28);
+ freezeButton.setBounds(310,457,87,28);recordButton.setBounds(400,457,93,28);
+ playButton.setBounds(496,457,93,28);resetJoyButton.setBounds(593,457,107,28);
+ seqButton.setBounds(810,460,158,29);
+ storeA.setBounds(735,525,80,28);recallA.setBounds(823,525,80,28);
+ storeB.setBounds(735,560,80,28);recallB.setBounds(823,560,80,28);
+ delayMixKnob.setBounds(388,586,85,90);delayLabel.setBounds(383,676,95,22);
+ delayFeedbackKnob.setBounds(490,586,85,90);feedbackLabel.setBounds(480,676,105,22);
+ seqDepthKnob.setBounds(596,586,85,90);seqLabel.setBounds(586,676,105,22);
  for(int i=0;i<16;++i){int x=0,y=0;
   if(i<6){x=25+(i%3)*112;y=170+(i/3)*150;}
   else if(i<12){x=730+((i-6)%3)*112;y=170+((i-6)/3)*150;}
   else {x=40+((i-12)%2)*112;y=520+((i-12)/2)*130;}
-  sliders[i]->setBounds(x,y,100,78);labels[i]->setBounds(x-5,y+78,110,22);dragHandles[i]->setBounds(x+15,y+105,70,21);
+  sliders[i]->setBounds(x,y,100,78);labels[i]->setBounds(x-5,y+78,110,22);
+  dragHandles[i]->setBounds(x+15,y+105,70,21);
  }
+ randomButton.setBounds(30,832,127,32);randomSafeButton.setBounds(166,832,150,32);
+ randomAmount.setBounds(74,878,90,90);randomLabel.setBounds(65,970,105,22);
+ filterModeBox.setBounds(353,842,180,28);modeLabel.setBounds(353,815,180,24);
+ vowelKnob.setBounds(349,895,92,86);vowelLabel.setBounds(341,982,110,22);
+ vowelShiftKnob.setBounds(465,895,92,86);shiftLabel.setBounds(455,982,110,22);
+ beatDivisionBox.setBounds(623,842,120,28);beatLabel.setBounds(623,815,120,24);
+ lfoDivisionBox.setBounds(793,842,120,28);lfoBeatLabel.setBounds(793,815,120,24);
+ timeMorphKnob.setBounds(641,895,92,86);timeLabel.setBounds(634,982,105,22);
+ lfoSyncButton.setBounds(795,901,117,32);
 }
 bool GrainBrainAudioProcessorEditor::isInterestedInFileDrag(const juce::StringArray& files){
  for(auto& f:files)if(juce::File(f).hasFileExtension("wav;aif;aiff"))return true;return false;
