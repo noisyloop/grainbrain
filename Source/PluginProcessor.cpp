@@ -70,7 +70,7 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
  const char* targets[]={"size","density","position","spray","pitch","pitchRand","reverse","spread","gain","lfoRate","lfoDepth","cutoff","resonance","filterMode","filterMotion","glitch"};
  const float minV[]={15,1,0,0,-24,0,0,0,0,.02f,0,80,.1f,0,0,0};
  const float maxV[]={500,70,1,1,24,12,1,1,1,15,1,18000,1.4f,3,1,1};
- const float joyX=get("joyX"),joyY=get("joyY");
+ float joyX=get("joyX"),joyY=get("joyY");
  auto effective=[&](int i){
   const float base=get(targets[i]);
   const juce::String id="joyRoute"+juce::String(i);
@@ -118,6 +118,13 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
    joyPlaybackPosition+=30.0/sampleRateHz;
    if(joyPlaybackPosition>=joyRecordedCount)joyPlaybackPosition-=joyRecordedCount;
   }
+  joyX=playX;joyY=playY;
+  // Re-evaluate joystick-routed parameters at audio rate for motion playback.
+  size=effective(0);density=effective(1);pos=effective(2);spray=effective(3);
+  pitch=effective(4);pitchRand=effective(5);reverse=effective(6);spread=effective(7);
+  gain=effective(8);rate=effective(9);depth=effective(10);
+  cutoff=effective(11);resonance=effective(12);filterMode=effective(13);
+  filterMotion=effective(14);glitch=effective(15);
   float modPos=juce::jlimit(0.f,1.f,pos+float(std::sin(lfoPhase*2*pi))*depth*.5f);
   if(freeze)modPos=float(freezePosition);else freezePosition=modPos;
   lfoPhase+=rate/sampleRateHz;if(lfoPhase>=1)lfoPhase-=1;
