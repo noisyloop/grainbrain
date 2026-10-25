@@ -40,6 +40,8 @@ private:
  juce::CriticalSection sampleLock;
  juce::String sampleName="Factory sine";
  double sampleRateHz=44100, lfoPhase=0;
+ std::array<float,2> filterLP{{0,0}},filterBP{{0,0}},glitchHeld{{0,0}};
+ int glitchCounter=0;
  std::mt19937 rng{0xC0FFEE};
  float random01();
  void startGrain(Note&,float,float,float,float,float);
