@@ -14,6 +14,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout GrainBrainAudioProcessor::ma
  add("cutoff","Filter cutoff",80,18000,9000);add("resonance","Filter resonance",.1f,1.4f,.3f);
  add("filterMode","Filter type (0 LP 1 HP 2 BP 3 Notch 4 Vowel)",0,4,0);
  add("filterMotion","Filter LFO depth",0,1,0);
+ add("filterMix","Filter wet/dry",0,1,.3f);
  add("vowel","Vowel morph A E I O U",0,4,0);
  add("vowelShift","Vowel shift semitones",-12,12,0);
  add("glitch","Glitch amount",0,1,0);
@@ -92,6 +93,7 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
 
  float size=effective(0),density=effective(1),pos=effective(2),spray=effective(3),pitch=effective(4),pitchRand=effective(5),reverse=effective(6),spread=effective(7),gain=effective(8),rate=effective(9),depth=effective(10);
  float cutoff=effective(11),resonance=effective(12),filterMode=effective(13),filterMotion=effective(14),glitch=effective(15);
+ const float filterWet=get("filterMix");
  const bool freeze=get("freeze")>.5f,recording=get("joyRecord")>.5f,playing=get("joyPlay")>.5f,sequenceEnabled=get("seqOn")>.5f;
  const float delayWet=get("delayMix"),feedback=get("delayFeedback"),sequenceDepth=get("seqDepth");
  const float division=get("seqDivision"),timeMod=get("seqTimeMod"),vowel=get("vowel"),vowelShift=get("vowelShift");
@@ -178,6 +180,7 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
   const float f=juce::jmin(.65f,2.f*std::sin(float(pi)*hz/float(sampleRateHz))); // Stable SVF range
   const float damping=juce::jlimit(.2f,1.95f,2.f-1.25f*resonance);
   float channels[2]={left,right};
+  const float dryGrains[2]={left,right};
   for(int ch=0;ch<2;++ch){
    const float hp=channels[ch]-filterLP[ch]-damping*filterBP[ch];
    filterBP[ch]+=f*hp;
@@ -198,12 +201,14 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
     channels[ch]=mode==0?filterLP[ch]:mode==1?hp:mode==2?filterBP[ch]:hp+filterLP[ch];
    }
   }
+  // The granulator remains the primary sound. Filters colour it in parallel, never replace it.
+  for(int ch=0;ch<2;++ch)channels[ch]=juce::jmap(filterWet,dryGrains[ch],channels[ch]);
   // Sample-and-hold / stutter glitch, deterministic in a held sample period.
   const float liveGlitch=juce::jlimit(0.f,1.f,glitch+seqGlitch);
   if(liveGlitch>.001f){
    const int interval=juce::jmax(2,int(sampleRateHz/(12.f+liveGlitch*125.f)));
    if(++glitchCounter>=interval){glitchCounter=0;glitchHeld={channels[0],channels[1]};}
-   const float mix=liveGlitch*.85f;
+   const float mix=liveGlitch*.55f; // Retain transients and granular detail even on intense glitches.
    channels[0]=channels[0]*(1.f-mix)+glitchHeld[0]*mix;
    channels[1]=channels[1]*(1.f-mix)+glitchHeld[1]*mix;
   }else glitchCounter=0;
@@ -255,8 +260,9 @@ void GrainBrainAudioProcessor::applyPreset(int index){
  const char* ids[]={"size","density","position","spray","pitch","pitchRand","reverse","spread","gain","lfoRate","lfoDepth"};
  for(int i=0;i<11;++i){auto* p=params.getParameter(ids[i]);p->setValueNotifyingHost(p->convertTo0to1(presets[index][i]));}
  const char* extraIds[]={"cutoff","resonance","filterMode","filterMotion","glitch"};
- const float extras[][5]={{14000,.3f,0,0,0},{4800,.5f,0,.15f,0},{9000,.7f,2,.45f,.7f},{1800,.65f,4,.3f,0},{12000,.3f,1,0,.15f},{4500,.6f,0,.65f,0},{7500,.45f,1,.7f,.35f},{3200,.8f,2,.8f,.2f},{1900,.6f,4,.9f,0},{4200,.85f,4,.95f,.3f},{2600,.7f,2,1.f,.7f},{1400,1.f,4,1.f,.45f},{6000,.95f,1,1.f,.9f}};
+ const float extras[][5]={{14000,.3f,0,0,0},{4800,.5f,0,.15f,0},{9000,.7f,2,.45f,.3f},{1800,.65f,4,.3f,0},{12000,.3f,1,0,.12f},{4500,.6f,0,.65f,0},{7500,.45f,1,.7f,.22f},{3200,.8f,2,.8f,.15f},{1900,.6f,4,.9f,0},{4200,.85f,4,.95f,.2f},{2600,.7f,2,1.f,.35f},{1400,1.f,4,1.f,.32f},{6000,.95f,1,1.f,.5f}};
  for(int i=0;i<5;++i){auto* p=params.getParameter(extraIds[i]);p->setValueNotifyingHost(p->convertTo0to1(extras[index][i]));}
+ if(auto* p=params.getParameter("filterMix"))p->setValueNotifyingHost(p->convertTo0to1(index>=9?.32f:index>=5?.23f:.18f));
  if(auto* p=params.getParameter("vowel"))p->setValueNotifyingHost(p->convertTo0to1(float(index%5)));
  if(auto* p=params.getParameter("seqDivision"))p->setValueNotifyingHost(p->convertTo0to1(float(index>=9?4:3)));
  if(auto* p=params.getParameter("seqTimeMod"))p->setValueNotifyingHost(p->convertTo0to1(index>=9?.5f:0.f));
@@ -314,7 +320,13 @@ void GrainBrainAudioProcessor::randomizePatch(float intensity,bool includeTiming
   if(auto* p=params.getParameter(ids[i])){
    const float old=p->getValue();
    const float novelty=random.nextFloat();
-   const float target=juce::jlimit(0.f,1.f,old+(novelty-old)*intensity);
+   float target=juce::jlimit(0.f,1.f,old+(novelty-old)*intensity);
+   // Keep the alpha randomizer musical: avoid permanent reverse, ultra-short grain buzz and excessive spectral FX.
+   if(juce::String(ids[i])=="size")target=juce::jlimit(.16f,.82f,target);
+   if(juce::String(ids[i])=="density")target=juce::jlimit(.08f,.72f,target);
+   if(juce::String(ids[i])=="glitch")target=juce::jmin(target,.45f);
+   if(juce::String(ids[i])=="filterMotion")target=juce::jmin(target,.65f);
+   if(juce::String(ids[i])=="pitchRand")target=juce::jmin(target,.65f);
    p->beginChangeGesture();p->setValueNotifyingHost(target);p->endChangeGesture();
   }
  }
