@@ -7,7 +7,14 @@ GrainBrainAudioProcessorEditor::GrainBrainAudioProcessorEditor(GrainBrainAudioPr
  helpLabel.setText("Drop WAV / AIFF here  |  Play MIDI notes  |  Select a preset",juce::dontSendNotification);
  helpLabel.setColour(juce::Label::textColourId,juce::Colours::lightgrey);addAndMakeVisible(helpLabel);
  addAndMakeVisible(loadButton);addAndMakeVisible(factoryButton);addAndMakeVisible(saveButton);addAndMakeVisible(openButton);addAndMakeVisible(presetBox);
- presetBox.addItem("Choose preset...",1);presetBox.addItem("Nebula",2);presetBox.addItem("Frozen Cloud",3);presetBox.addItem("Glitch Storm",4);presetBox.addItem("Deep Space",5);presetBox.addItem("Tight Pulses",6);presetBox.setSelectedId(1,juce::dontSendNotification);
+ presetBox.addItem("Choose preset...",1);
+ const char* presetNames[]={
+  "Classic / Nebula","Classic / Frozen Cloud","Classic / Glitch Storm","Classic / Deep Space","Classic / Tight Pulses",
+  "Motion / Breathing Clouds","Motion / Rhythmic Pulses","Motion / Stereo Drift","Motion / Slow Orbit",
+  "Pro / Recursive Orbit","Pro / Polyrhythm Engine","Pro / Fractal Drift","Pro / Interlocked Chaos"
+ };
+ for(int i=0;i<13;++i)presetBox.addItem(presetNames[i],i+2);
+ presetBox.setSelectedId(1,juce::dontSendNotification);
  presetBox.onChange=[this]{int id=presetBox.getSelectedId();if(id>=2)processor.applyPreset(id-2);};
  loadButton.onClick=[this]{chooser=std::make_unique<juce::FileChooser>("Choose a sample",juce::File{},"*.wav;*.aif;*.aiff");
  chooser->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectFiles,[this](const juce::FileChooser& c){auto f=c.getResult();if(f.existsAsFile())sampleLabel.setText(processor.loadSample(f)?processor.getSampleName():"Could not load sample",juce::dontSendNotification);});};
