@@ -1,0 +1,20 @@
+# Renders the plugin editor to PNGs for the README (Linux/macOS, not part of the plugin build).
+#   cmake -S tools/screenshots -B build-shots && cmake --build build-shots
+#   xvfb-run -a build-shots/GrainBrainShot_artefacts/Release/GrainBrainShot docs/screenshots   # on Linux
+cmake_minimum_required(VERSION 3.22)
+project(GrainBrainShot VERSION 0.1.0 LANGUAGES C CXX)
+set(CMAKE_CXX_STANDARD 17)
+if(JUCE_DIR)
+ add_subdirectory(${JUCE_DIR} juce)
+else()
+ include(FetchContent)
+ FetchContent_Declare(JUCE GIT_REPOSITORY https://github.com/juce-framework/JUCE.git GIT_TAG 8.0.10 GIT_SHALLOW TRUE)
+ FetchContent_MakeAvailable(JUCE)
+endif()
+set(SRC ${CMAKE_CURRENT_SOURCE_DIR}/../../Source)
+juce_add_console_app(GrainBrainShot PRODUCT_NAME GrainBrainShot)
+juce_generate_juce_header(GrainBrainShot)
+target_sources(GrainBrainShot PRIVATE main.cpp ${SRC}/PluginProcessor.cpp ${SRC}/PluginEditor.cpp)
+target_include_directories(GrainBrainShot PRIVATE ${SRC})
+target_compile_definitions(GrainBrainShot PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_JACK=0 JucePlugin_VersionString="${PROJECT_VERSION}")
+target_link_libraries(GrainBrainShot PRIVATE juce::juce_audio_utils juce::juce_dsp juce::juce_audio_formats juce::juce_gui_extra)

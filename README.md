@@ -1,5 +1,7 @@
 # GrainBrain
 
+![GrainBrain editor](docs/screenshots/grainbrain-main.png)
+
 ## Download for macOS
 
 **[⬇ Download the latest GrainBrain macOS build](https://github.com/noisyloop/grainbrain/actions/workflows/macos.yml)**
@@ -17,6 +19,13 @@ Experimental granular sample synthesizer for macOS (JUCE 8, C++17).
 - Sine position LFO with rate and depth
 - Five parameter presets: Nebula, Frozen Cloud, Glitch Storm, Deep Space, Tight Pulses
 - AU, VST3 and standalone macOS targets
+
+## Screenshots
+| Default patch | Joystick links, vowel filter and glitch steps |
+| --- | --- |
+| ![Default patch](docs/screenshots/grainbrain-main.png) | ![Modulated patch](docs/screenshots/grainbrain-modulation.png) |
+
+Screenshots are rendered from the real editor with `tools/screenshots` (see the comment at the top of its `CMakeLists.txt`).
 
 ## Build
 Requires Xcode, CMake 3.22+ and an internet connection (JUCE is fetched at configure time).
