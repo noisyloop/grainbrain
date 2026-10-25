@@ -26,6 +26,7 @@ public:
  bool loadSample(const juce::File&);
  void useFactoryWave();
  void applyPreset(int);
+ void randomizePatch(float intensity, bool includeTiming);
  bool saveUserPreset(const juce::File&);
  bool loadUserPreset(const juce::File&);
  juce::AudioProcessorValueTreeState params;
@@ -45,12 +46,13 @@ private:
  juce::String sampleName="Factory sine";
  double sampleRateHz=44100, lfoPhase=0;
  std::array<float,2> filterLP{{0,0}},filterBP{{0,0}},glitchHeld{{0,0}};
+ // Three independently tuned vowel resonators per channel (transposed direct-form II).
+ std::array<std::array<float,3>,2> vowelZ1{},vowelZ2{};
  int glitchCounter=0;
  double freezePosition=.35, sequencePhase=0, joyCaptureClock=0, joyPlaybackPosition=0;
  int sequenceStep=-1, joyRecordedCount=0;
  bool wasRecording=false, wasPlaying=false;
  std::array<std::array<float,2>,1024> joyRecording{};
- std::array<float,2> delayFeedback{{0,0}};
  juce::AudioBuffer<float> delayLine;
  int delayIndex=0;
  float currentBpm=120.f;
