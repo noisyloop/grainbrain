@@ -3,6 +3,11 @@
 GrainBrainAudioProcessorEditor::GrainBrainAudioProcessorEditor(GrainBrainAudioProcessor& p):AudioProcessorEditor(&p),processor(p),orb(p){
  addAndMakeVisible(orb);
  addAndMakeVisible(clearRoutes);
+ for(auto* b:{&storeA,&storeB,&recallA,&recallB})addAndMakeVisible(*b);
+ storeA.onClick=[this]{processor.getStateInformation(snapshotA);};
+ storeB.onClick=[this]{processor.getStateInformation(snapshotB);};
+ recallA.onClick=[this]{if(snapshotA.getSize()>0)processor.setStateInformation(snapshotA.getData(),int(snapshotA.getSize()));};
+ recallB.onClick=[this]{if(snapshotB.getSize()>0)processor.setStateInformation(snapshotB.getData(),int(snapshotB.getSize()));};
  for(auto* b:{&freezeButton,&recordButton,&playButton,&seqButton,&resetJoyButton})addAndMakeVisible(*b);
  auto toggle=[this](const char* id){if(auto* par=processor.params.getParameter(id))par->setValueNotifyingHost(par->getValue()>.5f?0.f:1.f);};
  freezeButton.onClick=[toggle]{toggle("freeze");};
