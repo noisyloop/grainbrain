@@ -15,6 +15,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout GrainBrainAudioProcessor::ma
  add("filterMode","Filter type (0 LP 1 HP 2 BP 3 Formant)",0,3,0);
  add("filterMotion","Filter LFO depth",0,1,0);
  add("glitch","Glitch amount",0,1,0);
+ add("joyX","Brain Joystick X",0,1,.5f);add("joyY","Brain Joystick Y",0,1,.5f);
+ for(int i=0;i<16;++i){juce::String id="joyRoute"+juce::String(i);p.add(std::make_unique<P>(juce::ParameterID{id,1},"Joystick route "+juce::String(i+1),juce::NormalisableRange<float>(0,2,1),0));}
  return p;
 }
 GrainBrainAudioProcessor::GrainBrainAudioProcessor():AudioProcessor(BusesProperties().withOutput("Output",juce::AudioChannelSet::stereo(),true)),params(*this,nullptr,"PARAMETERS",makeLayout()){useFactoryWave();}
@@ -51,8 +53,21 @@ void GrainBrainAudioProcessor::startGrain(Note& note,float position,float spray,
 void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::MidiBuffer& midi){
  juce::ScopedNoDenormals noDenormals;out.clear();juce::ScopedTryLock lock(sampleLock);if(!lock.isLocked())return;
  auto get=[&](const char* id){return params.getRawParameterValue(id)->load();};
- float size=get("size"),density=get("density"),pos=get("position"),spray=get("spray"),pitch=get("pitch"),pitchRand=get("pitchRand"),gain=get("gain"),rate=get("lfoRate"),depth=get("lfoDepth");
- float cutoff=get("cutoff"),resonance=get("resonance"),filterMode=get("filterMode"),filterMotion=get("filterMotion"),glitch=get("glitch");
+ const char* targets[]={"size","density","position","spray","pitch","pitchRand","reverse","spread","gain","lfoRate","lfoDepth","cutoff","resonance","filterMode","filterMotion","glitch"};
+ const float minV[]={15,1,0,0,-24,0,0,0,0,.02f,0,80,.1f,0,0,0};
+ const float maxV[]={500,70,1,1,24,12,1,1,1,15,1,18000,1.4f,3,1,1};
+ const float joyX=get("joyX"),joyY=get("joyY");
+ auto effective=[&](int i){
+  const float base=get(targets[i]);
+  const juce::String id="joyRoute"+juce::String(i);
+  const float route=get(id.toRawUTF8());
+  if(route<.5f)return base;
+  const float axis=route<1.5f?joyX:joyY;
+  return juce::jlimit(minV[i],maxV[i],base+(axis-.5f)*(maxV[i]-minV[i])*.85f);
+ };
+
+ float size=effective(0),density=effective(1),pos=effective(2),spray=effective(3),pitch=effective(4),pitchRand=effective(5),gain=effective(8),rate=effective(9),depth=effective(10);
+ float cutoff=effective(11),resonance=effective(12),filterMode=effective(13),filterMotion=effective(14),glitch=effective(15);
  int n=sample.getNumSamples();if(n<16)return;
  juce::MidiBuffer::Iterator events(midi);juce::MidiMessage msg;int eventPos=0;bool hasEvent=events.getNextEvent(msg,eventPos);
  for(int i=0;i<out.getNumSamples();++i){
