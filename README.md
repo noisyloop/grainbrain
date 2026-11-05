@@ -10,7 +10,7 @@ Open the newest **successful** workflow run and scroll to **Artifacts**. Downloa
 
 To install manually, copy `GrainBrain.vst3` to `~/Library/Audio/Plug-Ins/VST3/`, `GrainBrain.component` to `~/Library/Audio/Plug-Ins/Components/`, and `GrainBrain.app` to `/Applications/`. You may need to approve the unsigned app in macOS Privacy & Security.
 
-Experimental granular sample synthesizer for macOS (JUCE 8, C++17).
+Experimental granular sample synthesizer for macOS (JUCE 8, C++17). See [lab.md](lab.md) for build notes and security.
 
 ## Features
 - MIDI-triggered grain clouds (16-note pool / 256 overlapping grains)
@@ -36,6 +36,9 @@ cmake --build build --config Release --parallel 3
 ```
 
 The GitHub Actions workflow builds on macos-15 and uploads a DMG plus the plugin bundles. In the Actions tab, open **macOS Builds** and run the workflow, or push to main.
+
+## Lab notes & security
+How we built GrainBrain (our first VST), the security review, and the rules for keeping it safe: **[lab.md](lab.md)**.
 
 ## Important
 This is an experimental MVP, not yet production-ready. User-loaded samples are not embedded in DAW session state; reload them when reopening a session. No Apple Developer signing/notarization is configured, so macOS Gatekeeper may warn. Build status must be verified in GitHub Actions.

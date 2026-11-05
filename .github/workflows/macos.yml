@@ -7,6 +7,9 @@ on:
       - '**/*.md'
       - 'docs/**'
       - '.gitignore'
+# Least privilege: the build only needs to read the repo and upload artifacts.
+permissions:
+  contents: read
 concurrency:
   group: macos-build-${{ github.ref }}
   cancel-in-progress: true
@@ -14,9 +17,11 @@ jobs:
   build:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Restore incremental CMake build cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: build
           key: grainbrain-macos15-xcode-v2-${{ hashFiles('CMakeLists.txt') }}-${{ github.sha }}
@@ -39,9 +44,11 @@ jobs:
           test -d dist/GrainBrain.vst3
           test -n "$(ls -A dist)"
           hdiutil create -volname GrainBrain -srcfolder dist -ov -format UDZO GrainBrain-macOS.dmg
-      - uses: actions/upload-artifact@v4
+          shasum -a 256 GrainBrain-macOS.dmg | tee GrainBrain-macOS.dmg.sha256
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: GrainBrain-macOS
           path: |
             GrainBrain-macOS.dmg
+            GrainBrain-macOS.dmg.sha256
             dist/
