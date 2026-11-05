@@ -14,6 +14,7 @@ static void shoot(GrainBrainAudioProcessor& p,const juce::File& out){
  std::cout<<"wrote "<<out.getFullPathName()<<"\n";
 }
 int main(int argc,char** argv){
+ if(argc<2){std::cerr<<"usage: GrainBrainShot <output-dir>\n";return 1;}
  juce::ScopedJuceInitialiser_GUI init;
  juce::File dir(argv[1]);dir.createDirectory();
  {GrainBrainAudioProcessor p;p.prepareToPlay(48000,512);

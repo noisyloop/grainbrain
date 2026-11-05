@@ -2,6 +2,7 @@
 #include "PluginEditor.h"
 #include <cmath>
 #include <algorithm>
+#include <limits>
 namespace { constexpr double pi = juce::MathConstants<double>::pi; }
 juce::AudioProcessorValueTreeState::ParameterLayout GrainBrainAudioProcessor::makeLayout() {
  using P=juce::AudioParameterFloat;
@@ -51,7 +52,10 @@ void GrainBrainAudioProcessor::useFactoryWave(){
 }
 bool GrainBrainAudioProcessor::loadSample(const juce::File& f){
  juce::AudioFormatManager fm;fm.registerBasicFormats();std::unique_ptr<juce::AudioFormatReader> reader(fm.createReaderFor(f));
- if(!reader||reader->sampleRate<=0||reader->lengthInSamples<16||reader->lengthInSamples>reader->sampleRate*180)return false;
+ // Untrusted file: bound the header values before trusting them for allocation sizes.
+ // 180 s at up to 384 kHz keeps every count well inside int and memory reasonable.
+ if(!reader||!std::isfinite(reader->sampleRate)||reader->sampleRate<8000||reader->sampleRate>384000)return false;
+ if(reader->lengthInSamples<16||reader->lengthInSamples>juce::int64(reader->sampleRate*180))return false;
  const int count=int(reader->lengthInSamples),chs=juce::jmin(2,int(reader->numChannels));if(chs<1)return false;
  juce::AudioBuffer<float> input(chs,count);if(!reader->read(&input,0,count,0,true,true))return false;
  int target=juce::jmax(16,int(std::round(count*44100.0/reader->sampleRate)));juce::AudioBuffer<float> converted(1,target);
@@ -72,8 +76,10 @@ void GrainBrainAudioProcessor::startGrain(Note& note,float position,float spray,
  g.amp=note.velocity;g.pan=(random01()*2-1)*spread;g.active=true;
 }
 void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::MidiBuffer& midi){
- juce::ScopedNoDenormals noDenormals;out.clear();juce::ScopedTryLock lock(sampleLock);if(!lock.isLocked())return;
- auto get=[&](const char* id){return params.getRawParameterValue(id)->load();};
+ juce::ScopedNoDenormals noDenormals;out.clear();if(out.getNumChannels()<2)return;
+ juce::ScopedTryLock lock(sampleLock);if(!lock.isLocked())return;
+ // Parameter values can come from host sessions or preset files; never let NaN/Inf reach DSP or indexing.
+ auto get=[&](const char* id){const float v=params.getRawParameterValue(id)->load();return std::isfinite(v)?v:0.f;};
  const char* targets[]={"size","density","position","spray","pitch","pitchRand","reverse","spread","gain","lfoRate","lfoDepth","cutoff","resonance","filterMode","filterMotion","glitch"};
  const float minV[]={15,1,0,0,-24,0,0,0,0,.02f,0,80,.1f,0,0,0};
  const float maxV[]={500,70,1,1,24,12,1,1,1,15,1,18000,1.4f,4,1,1};
@@ -166,14 +172,16 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
    const float dynamicRate=divisionFactor*std::pow(2.f,timeMod*shape*2.f);
    sequencePhase+=currentBpm*dynamicRate/(60.0*sampleRateHz);
    if(sequencePhase>=16.0)sequencePhase-=16.0;
-   const int newStep=int(sequencePhase);
+   if(!std::isfinite(sequencePhase)||sequencePhase<0)sequencePhase=0;
+   const int newStep=juce::jlimit(0,15,int(sequencePhase));
    if(newStep!=sequenceStep)sequenceStep=newStep;
    if(pattern[newStep]){seqGlitch=sequenceDepth;seqPitch=(newStep%4==0?12.f:0.f)*sequenceDepth;}
   }
   for(auto& note:notes)if(note.active){note.spawnClock+=density/sampleRateHz;if(note.spawnClock>=1){note.spawnClock-=1;startGrain(note,modPos,spray,size,pitch+seqPitch,pitchRand,reverse,spread);}}
   float left=0,right=0;
   for(auto& g:grains)if(g.active){
-   double wrapped=std::fmod(g.position,double(n));if(wrapped<0)wrapped+=n;int a=int(wrapped),b=(a+1)%n;
+   if(!std::isfinite(g.position)||!std::isfinite(g.step)){g.active=false;continue;}
+   double wrapped=std::fmod(g.position,double(n));if(wrapped<0)wrapped+=n;int a=juce::jlimit(0,n-1,int(wrapped)),b=(a+1)%n;
    float s=juce::jmap(float(wrapped-a),sample.getSample(0,a),sample.getSample(0,b));
    float window=.5f-.5f*std::cos(float(2*pi*g.age/juce::jmax(1,g.length-1)));float v=s*window*g.amp;
    left+=v*std::sqrt(.5f*(1-g.pan));right+=v*std::sqrt(.5f*(1+g.pan));g.position+=g.step;if(++g.age>=g.length)g.active=false;
@@ -228,6 +236,10 @@ void GrainBrainAudioProcessor::processBlock(juce::AudioBuffer<float>& out,juce::
    }
    if(++delayIndex>=length)delayIndex=0;
   }else for(auto& ch:channels)ch=std::tanh(ch*gain*.35f);
+  // Last line of defence: a non-finite sample would poison the host's mix bus and our feedback state.
+  if(!std::isfinite(channels[0])||!std::isfinite(channels[1])){
+   channels[0]=channels[1]=0.f;filterLP={0,0};filterBP={0,0};vowelZ1={};vowelZ2={};glitchHeld={0,0};delayLine.clear();
+  }
   out.setSample(0,i,channels[0]);out.setSample(1,i,channels[1]);
  }
  for(size_t k=0;k<visualPosition.size();++k){
@@ -329,8 +341,21 @@ void GrainBrainAudioProcessor::getStateInformation(juce::MemoryBlock& b){
  copyXmlToBinary(*xml,b);
 }
 void GrainBrainAudioProcessor::setStateInformation(const void* data,int size){
+ if(data==nullptr||size<=0||size>1024*1024)return;
  std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data,size));
  if(!xml||!xml->hasTagName(params.state.getType()))return;
+ // Session and preset data are untrusted: drop unknown parameters and reset non-finite values to their defaults.
+ for(auto* param=xml->getFirstChildElement();param!=nullptr;){
+  auto* next=param->getNextElement();
+  if(param->hasTagName("PARAM")){
+   auto* target=params.getParameter(param->getStringAttribute("id"));
+   const double value=param->getDoubleAttribute("value",std::numeric_limits<double>::quiet_NaN());
+   const auto text=param->getStringAttribute("value").trim().toLowerCase();
+   if(target==nullptr)xml->removeChildElement(param,true);
+   else if(!std::isfinite(value)||text.contains("nan")||text.contains("inf"))param->setAttribute("value",target->convertFrom0to1(target->getDefaultValue()));
+  }
+  param=next;
+ }
  std::array<std::array<float,2>,1024> restored{};
  int count=0;
  if(auto* child=xml->getChildByName("JoystickRecording")){
